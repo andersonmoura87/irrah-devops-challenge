@@ -220,6 +220,103 @@ reais, reprodução do incidente ou aplicação de mitigação.** Métricas/labe
 acessos, topologia e controles de carga precisam ser confirmados no ambiente real.
 As verificações do repositório não validam eficácia operacional em produção.
 
-## Questão pendente
+# Questão 4 — Cultura DevSecOps e Governança
 
-- Questão 4: pendente, não implementada.
+## Resposta às imagens vulneráveis em produção
+
+O [README](README.md) pede ações estruturais e culturais após a esteira detectar
+CVEs críticas em imagens de produção. Trataria o relatório como início de um
+processo de remediação com responsáveis, sem concluir que severidade Critical
+prova exploração ou impacto. Contexto ajuda a priorizar; não justifica ignorar
+vulnerabilidades críticas.
+
+Primeiro relacionaria **CVE → pacote/versão → imagem/digest → workload/ambiente →
+owner**, incluindo containers auxiliares quando existentes. Distinguiria imagens
+armazenadas no registry, efetivamente executadas e antigas sem workload ativo.
+Tag ou imagem corrigida no registry não comprovam correção dos pods atuais.
+
+Com Security e dono do serviço, confirmaria advisory, versão/fix, exposição,
+alcançabilidade do componente, exploit conhecido, criticidade, privilégios e
+controles compensatórios. Dependência presente não implica uso/exploração, mas
+alegação de não utilização precisa de evidência. Críticas exploráveis/expostas
+receberiam prioridade máxima. Se necessário, conteria o caminho vulnerável com
+controle disponível e impacto avaliado; sinais de comprometimento exigem resposta
+coordenada, preservação de evidências e avaliação dos acessos atingidos.
+
+Corrigiria dependência ou base, testaria e reconstruiria a imagem, gerando novo
+digest e novo scan. Promoveria o mesmo artefato por staging/production pelo fluxo
+da Q2, acompanhando rollout e sinais operacionais da Q3. O fechamento exigiria
+evidência de que as réplicas e templates afetados usam a imagem corrigida, ligada
+ao relatório e à decisão de promoção. Não apagaria indiscriminadamente imagens
+vulneráveis: excluir do registry não corrige containers em execução. Rollback
+precisa considerar segurança e compatibilidade; voltar ao digest anterior pode
+reintroduzir a CVE e exige decisão de risco, não reversão automática.
+
+## Prevenção no pipeline e governança de exceções
+
+Proponho complementar a Q2 com feedback de dependências no PR, scan da imagem
+final após build, decisão de política antes da promoção, reavaliação antes de
+production e rescans periódicos das imagens ativas. O resultado deve corresponder
+ao digest/plataforma promovidos, com versão do scanner, atualização da base,
+horário e cobertura registrados. Digest imutável também pode ganhar novos
+findings quando surgem advisories.
+
+**Trivy é a única ferramenta de referência proposta**, por cobrir dependências
+suportadas, imagens e geração de SBOM. Antes de adotá-lo, verificaria se o scanner
+existente já atende ao processo. Sua cobertura não prova reachability nem ausência
+de vulnerabilidades. Não há aplicação/Dockerfile aqui para executar esse fluxo;
+não acrescento workflow artificial nem scanner equivalente adicional.
+
+Política proposta: **reter promoção com Critical/High até remediação, classificação
+fundamentada ou exceção válida**. Sem fix ou aparente baixa exposição não liberam
+automaticamente; falso positivo exige evidência preservada. Outras severidades
+também são priorizadas por risco. Scan ausente, falho, desatualizado ou incompatível
+com o digest não equivale a aprovação. Emergência exige avaliar o risco de implantar
+versus não implantar e uma decisão identificada, sem desligar globalmente o gate.
+
+Exceção seria rara e auditável, contendo CVE/pacote, digest, workload/ambiente,
+justificativa, risco residual, controles compensatórios, owner, aprovador distinto,
+criação, expiração, plano/prazo e evidência de fechamento. O finding permanece
+visível; não há allowlist permanente ou renovação automática. Expiração bloqueia
+novas promoções pela exceção e escalona os workloads existentes, sem desligá-los
+automaticamente. Prazos de remediação e frescor do scan devem ser aprovados pela
+organização; não são SLAs existentes nem números exigidos pela IRRAH.
+
+Manteria bases mínimas e suportadas, versões/digests identificáveis e atualizações
+regulares com testes, incluindo rebuild para incorporar fixes mesmo sem mudança
+da aplicação. Pinagem sem atualização perpetua vulnerabilidades. **SBOM** ajuda
+a inventariar componentes; **assinatura/verificação** trata integridade e identidade
+confiável; **proveniência** registra origem/processo de build. São controles
+distintos: nenhum atesta imagem livre de CVEs. Assinatura/proveniência ficam como
+evolução condicionada à necessidade, sem infraestrutura adicional nesta entrega.
+
+## Cultura, responsabilidades e melhoria contínua
+
+Desenvolvedores corrigem dependências e testam; Platform mantém bases e integração
+reutilizável; DevOps/SRE opera promoção e verifica runtime/saúde; Security qualifica
+risco e revisa política/exceções; liderança prioriza capacidade e decide risco
+conforme autoridade definida. Cada finding tem owner: responsabilidade compartilhada
+não é transferir tudo para DevOps nem deixar correções sem responsável.
+
+Security champions, feedback acionável no PR, documentação de remediação e
+treinamento orientado aos problemas encontrados reduzem retrabalho. Usaria
+aprendizado blameless e o template da Q3 para falhas relevantes de processo,
+com ações, prazos e acompanhamento. Não puniria times por contagem bruta de CVEs:
+melhor cobertura pode aumentar achados; o incentivo deve ser descobrir e corrigir.
+
+Acompanharia críticas abertas por risco, aging, tempo até remediação verificada,
+tempo desde fix disponível, cobertura de scans válidos em digests ativos,
+promoções com decisão rastreável, exceções expiradas e bases obsoletas. São
+indicadores propostos, com escopo/denominador a definir, para orientar capacidade
+e reduzir exposição sem ocultar findings ou sacrificar disponibilidade sem análise.
+
+## Evidência e limites
+
+A [documentação detalhada da Q4](docs/security/q4-container-vulnerability-governance.md)
+contém processo, política, exceções, responsabilidades e critérios de fechamento.
+**Presente nesta entrega:** documentação. **Proposto:** controles no pipeline real
+da aplicação e na operação. **Não executado:** scan de imagem real, geração de
+SBOM da aplicação, assinatura, integração OCIR/OKE, deploy ou validação de workloads.
+Os workflows da Q2 permanecem intactos e não aplicam os gates descritos na Q4.
+Não se afirma conformidade, ausência de vulnerabilidades ou segurança comprovada
+por validação local dos documentos.
