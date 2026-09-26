@@ -1,13 +1,28 @@
+# Respostas — Prova Técnica DevOps/SRE
+
+Este documento reúne as respostas às quatro questões do desafio, com foco em
+Infraestrutura como Código, CI/CD, observabilidade/resposta a incidentes e
+governança DevSecOps.
+
+A entrega distingue explicitamente:
+
+- **implementado e validado neste repositório**;
+- **arquitetura/processo proposto como referência**;
+- **itens que dependeriam da aplicação ou de infraestrutura real para validação**.
+
+Os artefatos complementares estão versionados em `terraform/`, `.github/workflows/`
+e `docs/`.
+
 # Questão 1 — Infraestrutura como Código e Segurança
 
 ## Requisitos e escolhas
 
 O [README original](README.md) exige Kubernetes, banco relacional gerenciado,
 bucket de conversas, staging/production separados e credenciais fora do código,
-com DevSecOps. Interpretamos a dupla negação como proibição de expor credenciais.
+com DevSecOps. Interpreto a dupla negação como proibição de expor credenciais.
 O enunciado aceita estrutura/pseudocódigo Terraform ou descrição detalhada.
 OCI/PostgreSQL são preferências adotadas; tenancy/região únicas, OKE Enhanced,
-Vault e recursos separados são decisões nossas, não novas exigências da IRRAH.
+Vault e recursos separados são decisões minhas, não novas exigências da IRRAH.
 
 ## Implementação de referência
 
@@ -61,13 +76,13 @@ das credenciais, trade-offs e revisões necessárias antes de produção.
 
 O [README original](README.md) pede pipeline com code review, testes, build, zero
 downtime no Kubernetes, mitigação de risco na atualização e rollback rápido. O
-enunciado aceita desenho ou descrição; adotamos **GitHub Actions** e documentação
+enunciado aceita desenho ou descrição; adoto **GitHub Actions** e documentação
 em [docs/architecture/q2-cicd-zero-downtime.md](docs/architecture/q2-cicd-zero-downtime.md).
 
 Este repositório **não contém** a aplicação de WhatsApp. Rolling Update
 (`maxUnavailable=0`, `maxSurge=1`), promoção por **digest**, OCIR, OIDC GitHub→OCI,
-GitHub Environment protegido em production (configuração **externa** proposta), OIDC
-GitHub→OCI e expand/contract em migrations são **decisões de referência** alinhadas ao
+GitHub Environment protegido em production (configuração **externa** proposta)
+e expand/contract em migrations são **decisões de referência** alinhadas ao
 cenário crítico, não exigências literais do enunciado.
 
 ## Implementação de referência
