@@ -1,0 +1,39 @@
+# Copiar para staging/terraform.tfvars OU production/terraform.tfvars.
+# null em campo numerico e um marcador deliberadamente incompleto, nao um default.
+# Definir valores com base em capacidade, orcamento, regiao e retencao aprovados.
+settings = {
+  region                = "REPLACE_WITH_OCI_REGION"
+  tenancy_id            = "REPLACE_WITH_TENANCY_OCID"
+  parent_compartment_id = "REPLACE_WITH_PARENT_COMPARTMENT_OCID"
+  name_prefix           = "REPLACE_WITH_UNIQUE_PREFIX"
+  vcn_cidr              = "REPLACE_WITH_ENVIRONMENT_VCN_CIDR"
+  pods_cidr             = "REPLACE_WITH_NON_OVERLAPPING_POD_CIDR"
+  services_cidr         = "REPLACE_WITH_NON_OVERLAPPING_SERVICE_CIDR"
+  admin_cidrs           = [] # Sem acesso administrativo de rede ate definir origem privada e rota.
+  kubernetes_version    = "REPLACE_WITH_SUPPORTED_KUBERNETES_VERSION"
+  node_image_id         = "REPLACE_WITH_COMPATIBLE_OCI_OKE_IMAGE_OCID"
+  node_shape            = "REPLACE_WITH_SUPPORTED_FLEX_SHAPE"
+  node_ocpus            = null
+  node_memory_gbs       = null
+  node_count            = null
+  availability_domain  = "REPLACE_WITH_AVAILABILITY_DOMAIN"
+  postgres_version     = "REPLACE_WITH_SUPPORTED_POSTGRESQL_VERSION"
+  postgres_shape       = "REPLACE_WITH_SUPPORTED_POSTGRESQL_SHAPE"
+  postgres_ocpus        = null
+  postgres_memory_gbs   = null
+  postgres_instance_count = null
+  postgres_regional_storage = null # Definir true/false conforme regiao e disponibilidade pretendida.
+  backup_retention_days = null
+  backup_start          = "REPLACE_WITH_BACKUP_START_TIME"
+  maintenance_window    = "REPLACE_WITH_MAINTENANCE_WINDOW"
+
+  # Fase 1: cria fundacao/Vault/OKE/bucket; NAO cria PostgreSQL.
+  database_bootstrap_secret  = null
+  application_secret_ids = []
+  # Fase 2: preencher somente identificadores dos secrets criados por canal seguro.
+  # database_bootstrap_secret = {
+  #   id      = "REPLACE_WITH_DATABASE_ADMIN_SECRET_OCID"
+  #   version = "REPLACE_WITH_SECRET_VERSION_NUMBER"
+  # }
+  # application_secret_ids = ["REPLACE_WITH_APP_DB_SECRET_OCID", "REPLACE_WITH_AI_API_SECRET_OCID"]
+}

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-agents
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ai-agent
+  namespace: ai-agents
+# SDK OCI workload identity requer token da service account. Nenhum RoleBinding para ela.
+automountServiceAccountToken: true

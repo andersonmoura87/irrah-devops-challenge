@@ -1,0 +1,10 @@
+# Identificadores nao secretos. Substituir TODOS os marcadores antes de planejar.
+region                = "REPLACE_WITH_OCI_REGION"
+tenancy_id            = "REPLACE_WITH_TENANCY_OCID"
+parent_compartment_id = "REPLACE_WITH_PARENT_COMPARTMENT_OCID"
+name_prefix           = "REPLACE_WITH_UNIQUE_PREFIX"
+state_group_ids = {
+  bootstrap  = "REPLACE_WITH_BOOTSTRAP_GROUP_OCID"
+  staging    = "REPLACE_WITH_STAGING_GROUP_OCID"
+  production = "REPLACE_WITH_PRODUCTION_GROUP_OCID"
+}

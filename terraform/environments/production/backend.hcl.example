@@ -1,0 +1,5 @@
+# Copiar para backend.backend.hcl (ignorado pelo Git) e preencher com outputs do bootstrap.
+namespace = "REPLACE_WITH_OBJECT_STORAGE_NAMESPACE"
+bucket    = "REPLACE_WITH_ENVIRONMENT_STATE_BUCKET"
+key       = "production/terraform.tfstate"
+region    = "REPLACE_WITH_OCI_REGION"

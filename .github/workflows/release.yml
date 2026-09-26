@@ -1,0 +1,90 @@
+# Workflow de REFERÊNCIA para gates de uma futura promoção por digest.
+# Não promove artefato, não publica imagem, não autentica na OCI e não aplica manifests no OKE.
+# Build, push (OCIR) e deploy (kubectl) estão descritos em
+# docs/architecture/q2-cicd-zero-downtime.md.
+#
+# Disparo manual para evitar execução acidental neste repositório de challenge.
+
+name: Release (referência)
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: "Digest imutável da imagem (formato sha256:<64 hex minúsculas>)"
+        required: true
+        type: string
+      deploy_target:
+        description: "Ambiente de destino"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      confirm_production:
+        description: 'Obrigatório para production: digite exatamente "production"'
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.deploy_target }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validar entradas de promoção
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validar formato do digest
+        env:
+          DIGEST: ${{ github.event.inputs.image_digest }}
+        run: |
+          if ! echo "$DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
+            echo "Digest inválido: use sha256 seguido de 64 caracteres hexadecimais minúsculos."
+            exit 1
+          fi
+
+      - name: Exigir confirmação explícita para production
+        if: github.event.inputs.deploy_target == 'production'
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_production }}
+        run: |
+          if [ "$CONFIRM" != "production" ]; then
+            echo 'Deploy em production exige confirm_production="production".'
+            exit 1
+          fi
+
+      - name: Verificar limites deste repositório
+        run: |
+          if [ -f Dockerfile ]; then
+            echo "Dockerfile inesperado: este challenge não versiona imagem de aplicação."
+            exit 1
+          fi
+          test -d terraform
+
+  staging-gate:
+    name: Gate de staging (referência)
+    needs: validate
+    if: github.event.inputs.deploy_target == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+  production-gate:
+    name: Gate de production (referência)
+    needs: validate
+    if: github.event.inputs.deploy_target == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4

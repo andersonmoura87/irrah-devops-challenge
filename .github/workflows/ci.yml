@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "terraform/**"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform-format:
+    name: Terraform format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.2"
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+        working-directory: terraform
+
+  terraform-validate:
+    name: Terraform (${{ matrix.root }})
+    needs: terraform-format
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - root: bootstrap-state
+            working-directory: terraform/bootstrap-state
+            run-tests: false
+          - root: staging
+            working-directory: terraform/environments/staging
+            run-tests: true
+          - root: production
+            working-directory: terraform/environments/production
+            run-tests: false
+    defaults:
+      run:
+        working-directory: ${{ matrix.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.2"
+
+      - name: Init (sem backend remoto)
+        run: terraform init -backend=false
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Test (planos mock da Q1)
+        if: matrix.run-tests
+        run: terraform test
