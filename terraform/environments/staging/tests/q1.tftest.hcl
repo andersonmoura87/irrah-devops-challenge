@@ -1,47 +1,13 @@
-# Valores abaixo sao fixtures sinteticas de teste; nao dimensionam nenhum ambiente.
+# Fixtures sinteticas compartilhadas; nao dimensionam nenhum ambiente.
 # command=plan com provider mock: nenhuma API OCI e chamada e nenhum recurso e criado.
-mock_provider "oci" {}
-
-override_data {
-  target = data.oci_core_services.this
-  values = {
-    services = [{ id = "test-service", cidr_block = "test-services-cidr", name = "All TEST Services In Oracle Services Network" }]
-  }
-}
-
-override_data {
-  target = data.oci_objectstorage_namespace.this
-  values = { namespace = "test-namespace" }
+mock_provider "oci" {
+  source          = "../../tests/fixtures"
+  override_during = plan
 }
 
 variables {
   environment = "staging"
-  settings = {
-    region                    = "test-region"
-    tenancy_id                = "test-tenancy"
-    parent_compartment_id     = "test-parent"
-    name_prefix               = "test-q1"
-    vcn_cidr                  = "10.0.0.0/16"
-    pods_cidr                 = "10.244.0.0/16"
-    services_cidr             = "10.96.0.0/16"
-    admin_cidrs               = ["10.1.0.0/24"]
-    kubernetes_version        = "v1.33.1"
-    node_image_id             = "test-image"
-    node_shape                = "VM.Standard.E4.Flex"
-    node_ocpus                = 1
-    node_memory_gbs           = 16
-    node_count                = 1
-    availability_domain       = "test-ad"
-    postgres_version          = "14"
-    postgres_shape            = "PostgreSQL.VM.Standard.E4.Flex"
-    postgres_ocpus            = 2
-    postgres_memory_gbs       = 32
-    postgres_instance_count   = 1
-    postgres_regional_storage = false
-    backup_retention_days     = 7
-    backup_start              = "02:00"
-    maintenance_window        = "sun 03:00:00"
-  }
+  settings    = jsondecode(file("../../tests/fixtures/environment.json"))
 }
 
 run "foundation_without_database" {
@@ -58,8 +24,17 @@ run "foundation_without_database" {
     error_message = "Bucket deve ser privado e OKE Enhanced deve ter endpoint sem IP publico."
   }
   assert {
-    condition     = alltrue([for subnet in oci_core_subnet.this : subnet.prohibit_public_ip_on_vnic && subnet.prohibit_internet_ingress]) && length(oci_core_route_table.private.route_rules) == 1 && one(oci_core_route_table.private.route_rules).destination_type == "SERVICE_CIDR_BLOCK"
+    condition     = alltrue([for subnet in oci_core_subnet.this : subnet.prohibit_public_ip_on_vnic && subnet.prohibit_internet_ingress && subnet.route_table_id == oci_core_route_table.private.id]) && length(oci_core_route_table.private.route_rules) == 1 && one(oci_core_route_table.private.route_rules).destination_type == "SERVICE_CIDR_BLOCK" && one(oci_core_route_table.private.route_rules).destination == "test-services-cidr" && one(oci_core_route_table.private.route_rules).network_entity_id == oci_core_service_gateway.this.id
     error_message = "Subnets devem ser privadas e a unica rota externa deve ser para servicos OCI."
+  }
+  assert {
+    condition = alltrue([for key in ["workers_mtu", "workers_mtu_out"] :
+      oci_core_network_security_group_security_rule.this[key].protocol == "1" &&
+      !oci_core_network_security_group_security_rule.this[key].stateless &&
+      one(oci_core_network_security_group_security_rule.this[key].icmp_options).type == 3 &&
+      one(oci_core_network_security_group_security_rule.this[key].icmp_options).code == 4
+    ]) && oci_core_network_security_group_security_rule.this["workers_mtu"].direction == "INGRESS" && oci_core_network_security_group_security_rule.this["workers_mtu"].source_type == "CIDR_BLOCK" && oci_core_network_security_group_security_rule.this["workers_mtu"].source == "0.0.0.0/0" && oci_core_network_security_group_security_rule.this["workers_mtu_out"].direction == "EGRESS" && oci_core_network_security_group_security_rule.this["workers_mtu_out"].destination_type == "CIDR_BLOCK" && oci_core_network_security_group_security_rule.this["workers_mtu_out"].destination == "0.0.0.0/0"
+    error_message = "ICMP amplo dos workers deve permitir somente PMTUD stateful tipo 3/codigo 4, nunca todo ICMP."
   }
   assert {
     condition     = oci_core_network_security_group_security_rule.this["database_from_workers"].tcp_options[0].destination_port_range[0].min == 5432 && oci_core_network_security_group_security_rule.this["database_from_workers"].source_type == "NETWORK_SECURITY_GROUP" && oci_core_network_security_group_security_rule.this["api_support"].tcp_options[0].destination_port_range[0].min == 9995
