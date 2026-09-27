@@ -5,12 +5,22 @@ on:
     paths:
       - "terraform/**"
       - ".github/workflows/**"
+      - "scripts/**"
+      - "*.md"
+      - "docs/**"
+      - ".gitignore"
+      - ".gitattributes"
   push:
     branches:
       - main
     paths:
       - "terraform/**"
       - ".github/workflows/**"
+      - "scripts/**"
+      - "*.md"
+      - "docs/**"
+      - ".gitignore"
+      - ".gitattributes"
 
 permissions:
   contents: read
@@ -20,15 +30,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  repository-checks:
+    name: Links locais e contrato do digest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Testar validacao do digest
+        run: bash scripts/test-digest.sh
+
+      - name: Testar verificador de links
+        run: node --test scripts/check-markdown-links.test.mjs
+
+      - name: Verificar destinos Markdown locais
+        run: node scripts/check-markdown-links.mjs
+
   terraform-format:
     name: Terraform format
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "1.12.2"
 
@@ -46,32 +76,33 @@ jobs:
         include:
           - root: bootstrap-state
             working-directory: terraform/bootstrap-state
-            run-tests: false
           - root: staging
             working-directory: terraform/environments/staging
-            run-tests: true
           - root: production
             working-directory: terraform/environments/production
-            run-tests: false
     defaults:
       run:
         working-directory: ${{ matrix.working-directory }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "1.12.2"
 
       - name: Init (sem backend remoto)
-        run: terraform init -backend=false
+        run: terraform init -backend=false -input=false -lockfile=readonly
 
       - name: Validate
         run: terraform validate
 
-      - name: Test (planos mock da Q1)
-        if: matrix.run-tests
+      - name: Test (contratos dos roots e planos mock da Q1)
         run: terraform test
+
+      - name: Confirmar lockfile inalterado
+        run: git diff --exit-code -- .terraform.lock.hcl

@@ -40,16 +40,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Validar formato do digest
+        shell: bash
         env:
           DIGEST: ${{ github.event.inputs.image_digest }}
-        run: |
-          if ! echo "$DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
-            echo "Digest inválido: use sha256 seguido de 64 caracteres hexadecimais minúsculos."
-            exit 1
-          fi
+        run: bash scripts/validate-digest.sh "$DIGEST"
 
       - name: Exigir confirmação explícita para production
         if: github.event.inputs.deploy_target == 'production'
@@ -77,7 +76,9 @@ jobs:
     environment: staging
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
   production-gate:
     name: Gate de production (referência)
@@ -87,4 +88,6 @@ jobs:
     environment: production
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false

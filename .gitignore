@@ -11,3 +11,5 @@ crash.*.log
 *.key
 kubeconfig*
 !*.example
+/.local/
+/.evidence/
