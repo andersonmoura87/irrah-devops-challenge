@@ -10,8 +10,13 @@ A entrega distingue explicitamente:
 - **arquitetura/processo proposto como referência**;
 - **itens que dependeriam da aplicação ou de infraestrutura real para validação**.
 
-Os artefatos complementares estão versionados em `terraform/`, `.github/workflows/`
-e `docs/`.
+Os artefatos complementares estão versionados em `terraform/`, `.github/workflows/`,
+`docs/` e `lab/`. O diretório `lab/` contém um laboratório operacional local e
+reproduzível usado para validar, em Kubernetes kind, aspectos de readiness/liveness,
+graceful shutdown, rolling update/rollback, observabilidade com Prometheus/Grafana,
+troubleshooting com fault injection e security gates locais com Trivy e SBOM.
+Esse laboratório complementa as respostas conceituais e os artefatos de referência;
+não representa validação de OKE/OCI nem de um ambiente de produção.
 
 # Questão 1 — Infraestrutura como Código e Segurança
 
