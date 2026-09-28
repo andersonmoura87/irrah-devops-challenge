@@ -1,0 +1,6 @@
+{
+  "minSuccessRatio": 0.92,
+  "max503Rate": 0.04,
+  "maxP95Seconds": 0.12,
+  "minReadySum": 1.9
+}

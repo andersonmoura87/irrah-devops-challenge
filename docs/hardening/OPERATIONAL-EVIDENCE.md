@@ -12,7 +12,8 @@ de cada execução nem o histórico da entrega original.
 | Estática | Diff, configuração, links e revisão de claims | Não comprova integração/runtime |
 | Local P0 | fmt, init readonly, validate, planos mock, testes dos scripts | Não autentica nem provisiona OCI |
 | Local P1 | Artefatos em `lab/` + ações `scripts/lab.ps1` (build, deploy, scan, rollout, fault, observabilidade) | Laboratório **local**; não valida OKE/OCIR/produção; PostgreSQL P1 **não** implementado no repo |
-| Evidência bruta P1 | Saídas em `/.evidence/` (gitignored), p.ex. security gates e rollout | Não versionada por padrão; não substitui registro sanitizado aqui |
+| Local P2 | SLI/SLO (`verify-slo-lab`) e proveniência Cosign (`verify-provenance-lab`) | Objetivos **demonstrativos**; Cosign **não** prova OCIR/OKE |
+| Evidência bruta P1/P2 | Saídas em `/.evidence/` (gitignored), p.ex. lab-security, lab-rollout, lab-slo, lab-provenance | Não versionada por padrão; não substitui registro sanitizado aqui |
 | OCI-ONLY | Respostas e auditoria reais de integrações autorizadas | Não executado; exige ambiente OCI real |
 
 ## Contrato de cada execução
@@ -45,6 +46,8 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | A consolidar; verificador não prova veracidade dos claims |
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
 | P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
+| P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | A consolidar; thresholds versionados em runbook/`slo.go`, não SLA produção |
+| P2-PROVENANCE | `verify-provenance-lab`; Cosign sign+verify local | A consolidar; chaves em `/.evidence/`; OCIR **não** validado |
 | OCI | Casos de [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Não executados; exigem ambiente OCI real |
 
 Se uma validação não puder ser executada, registrar como **bloqueada**, sem
@@ -74,6 +77,16 @@ Interpretação obrigatória (não misturar camadas):
 Este documento **não** lista resultados de scan (contagens CVE, exit code de gate,
 révisions de Deployment) enquanto não forem transcritos de forma sanitizada a
 partir de uma execução real registrada nos campos do contrato acima.
+
+### P2: contrato de registro
+
+| ID | Entrada típica | Evidência sanitizada esperada | Não registrar como |
+| --- | --- | --- | --- |
+| P2-SLO | `verify-slo-lab` | Fases baseline/fault/recovery, thresholds citados, exit code, path `/.evidence/lab-slo/` | SLA de produção ou SLO da IRRAH |
+| P2-PROVENANCE | `verify-provenance-lab` | Digest da imagem, versão Cosign, resultado verify OK + verify com chave errada FAIL | Assinatura OCIR validada ou Rekor/keyless |
+
+Mesmas regras de campos (UTC real, commit, versões de ferramentas) aplicam-se a P2.
+Não preencher métricas SLI ou exit codes neste arquivo sem transcrição de execução.
 
 ## Retenção e conteúdo seguro
 
