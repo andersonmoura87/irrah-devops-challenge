@@ -48,11 +48,22 @@ retroativo na iteração P0.
 | Fault injection 5xx/latência e recuperação | Env no Deployment, `lab/runbooks/fault-injection-troubleshooting.md`; `verify-fault-lab` | **Implementado** (mecanismo + cenário script) |
 | PostgreSQL local com role restrita e secret fora do Git | — | **Não implementado**; sem manifests, app ou script correspondente no repo |
 
-## Backlog P2 e OCI-ONLY (fases futuras)
+## Status P2 (implementação local posterior)
+
+Itens de P2 demonstráveis **sem OCI**. Distinção: artefato no repo ≠ execução local ≠
+evidência consolidada em [OPERATIONAL-EVIDENCE.md](OPERATIONAL-EVIDENCE.md).
+
+| Item P2 | Artefatos / escopo | Status no repo |
+| --- | --- | --- |
+| SLI/SLO de laboratório (métricas existentes, objetivos demonstrativos) | `lab/app/slo.go`, `lab/runbooks/sli-slo-lab.md`; `verify-slo-lab` | **Implementado** (contrato + automação); execução local pelo operador |
+| Proveniência Cosign (sign + verify, digest local) | `lab/provenance/README.md`; `verify-provenance-lab` | **Implementado** (fluxo local); **não** integra OCIR nem workflow release |
+| Assinatura verificada em promoção OCIR / admission OKE | — | **Não implementado**; lacuna explícita |
+
+## Backlog P2 restante, P1 em aberto e OCI-ONLY
 
 | Prioridade | Entrega proposta / valor | Dependências e critério de conclusão | Risco de excesso |
 | --- | --- | --- | --- |
-| P2 | Assinatura/proveniência e controles adicionais de disponibilidade | Somente se resolverem necessidade identificada; consumidor valida o controle | Não acrescentar ferramentas apenas para assinar um artefato sem verificação |
+| P2 | Consumidor de assinatura no pipeline/registry (p.ex. gate antes de promoção por digest) | Artefato assinado em registry real; política e trust store definidos | Não simular OCIR neste lab |
 | OCI-ONLY | Nove casos de integração OCI, incluindo identidade, banco e deploy | Conta/rede/IAM autorizados; [critérios separados](OCI-VALIDATION-GAPS.md) | Não adaptar a arquitetura à Free Tier nem chamar testes locais de prova OCI |
 | P1 (restante) | PostgreSQL local conforme linha acima | Depende de caso mínimo de app + credenciais fora do Git | Não tratar como OCI Database gerenciado |
 
@@ -83,8 +94,9 @@ utilidade/alcançabilidade precisa de diagnóstico na topologia OCI efetiva.
 5. Revisar diff e resultados; encerrar P0 (iteração original).
 
 Após P0, o laboratório P1 foi desenvolvido em etapas (`lab/`, `scripts/lab.ps1`).
-Itens P1 ainda em aberto no repositório incluem **PostgreSQL local**. P2 e
-OCI-ONLY permanecem separados e não substituídos por execução kind local.
+Itens P1 ainda em aberto no repositório incluem **PostgreSQL local**. P2
+(parcial) acrescenta SLI/SLO local e proveniência Cosign verificável no daemon
+Docker; **OCI-ONLY** e consumo de assinatura em OCIR permanecem futuros.
 
 P0 está integralmente validado quando os checks exigidos passam, os resultados
 são rastreáveis, nenhum controle proposto é apresentado como executado e o diff

@@ -115,13 +115,18 @@ Artefatos versionados (visão geral):
 | Manifests Kubernetes | `lab/k8s/` (namespace, workload, observabilidade) |
 | Observabilidade | `lab/observability/README.md`, `lab/k8s/observability.yaml` |
 | Security gates (Trivy/SBOM) | `lab/security/README.md` |
-| Runbooks | `lab/runbooks/` (fault injection, rolling update/rollback) |
+| Runbooks | `lab/runbooks/` (fault injection, rolling update/rollback, SLI/SLO) |
+| P2 proveniência | `lab/provenance/README.md` (Cosign local, sem OCIR) |
 
 Ações típicas (consulte `-Action` no script; lista completa no próprio
 `scripts/lab.ps1`): `build`, `load`, `deploy`, `verify`, `deploy-obs`,
-`verify-obs`, `scan-security`, `verify-fault-lab`, `verify-rollout-lab`, `down`,
-`down-obs`, `fault-on` / `fault-off`. Detalhes, políticas e limites ficam nos
-READMEs e runbooks do `lab/` — este bootstrap não substitui essa documentação.
+`verify-obs`, `scan-security`, `verify-fault-lab`, `verify-rollout-lab`,
+`verify-slo-lab`, `verify-provenance-lab`, `down`, `down-obs`, `fault-on` /
+`fault-off`. Detalhes, políticas e limites ficam nos READMEs e runbooks do `lab/`
+— este bootstrap não substitui essa documentação.
+
+**P2 (local):** `verify-slo-lab` exige Prometheus + `lab-http` no kind;
+`verify-provenance-lab` opera só no Docker host (imagem local), sem cluster.
 
 Evidência bruta de execuções (relatórios Trivy, snapshots de rollout, etc.)
 deve ir para **`/.evidence/`** (gitignored). Relatórios versionados só com dados

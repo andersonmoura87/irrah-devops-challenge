@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('build', 'load', 'deploy', 'verify', 'down', 'deploy-obs', 'verify-obs', 'down-obs', 'fault-on', 'fault-off', 'fault-traffic', 'verify-fault-lab', 'scan-security', 'verify-rollout-lab')]
+    [ValidateSet('build', 'load', 'deploy', 'verify', 'down', 'deploy-obs', 'verify-obs', 'down-obs', 'fault-on', 'fault-off', 'fault-traffic', 'verify-fault-lab', 'scan-security', 'verify-rollout-lab', 'verify-slo-lab', 'verify-provenance-lab')]
     [string]$Action = 'verify',
     [int]$TrafficCount = 80,
     [string]$KindCommand = 'kind'
@@ -24,6 +24,10 @@ $labTrafficUrl = 'http://lab-http.irrah-lab.svc.cluster.local:8080/'
 $trivyImage = 'aquasec/trivy:0.59.1'
 $evidenceRoot = Join-Path $repository '.evidence/lab-security'
 $trivyCacheDir = Join-Path $repository '.evidence/trivy-cache'
+$sloEvidenceRoot = Join-Path $repository '.evidence/lab-slo'
+$provenanceEvidenceRoot = Join-Path $repository '.evidence/lab-provenance'
+$cosignImage = 'gcr.io/projectsigstore/cosign:v2.4.1'
+$sloConfigPath = Join-Path $repository 'lab/config/slo.json'
 
 function Invoke-Tool([string]$Command, [string[]]$Arguments) {
     $null = Get-Command -Name $Command -CommandType Application -ErrorAction Stop
@@ -87,6 +91,70 @@ function Get-PromQuerySum([string]$Query) {
         $sum += [double]$series.value[1]
     }
     return $sum
+}
+
+function Get-LabSLISnapshot {
+    return @{
+        Rate200 = (Get-PromQuerySum 'sum(rate(lab_http_requests_total{job="lab-http",code="200"}[2m]))')
+        Rate503 = (Get-PromQuerySum 'sum(rate(lab_http_requests_total{job="lab-http",code="503"}[2m]))')
+        P95     = (Get-PromQuerySum 'histogram_quantile(0.95, sum by (le) (rate(lab_http_request_duration_seconds_bucket{job="lab-http"}[2m])))')
+        Ready   = (Get-PromQuerySum 'sum(lab_ready{job="lab-http"})')
+    }
+}
+
+function Get-LabSuccessRatio([hashtable]$Snapshot) {
+    $denom = $Snapshot.Rate200 + $Snapshot.Rate503
+    if ($denom -le 0) { return 1.0 }
+    return $Snapshot.Rate200 / $denom
+}
+
+function Get-LabSLOThresholds {
+    if (-not $script:LabSLOThresholds) {
+        Assert-Condition (Test-Path $sloConfigPath) "Missing SLO config: $sloConfigPath"
+        $script:LabSLOThresholds = Get-Content -Raw -Path $sloConfigPath | ConvertFrom-Json
+    }
+    return $script:LabSLOThresholds
+}
+
+function Test-LabSLOSnapshot([hashtable]$Snapshot) {
+    $thresholds = Get-LabSLOThresholds
+    $violations = @()
+    $ratio = Get-LabSuccessRatio $Snapshot
+    if ($ratio -lt $thresholds.minSuccessRatio) {
+        $violations += "success ratio $([math]::Round($ratio,4)) < min $($thresholds.minSuccessRatio)"
+    }
+    if ($Snapshot.Rate503 -gt $thresholds.max503Rate) {
+        $violations += "503 rate $([math]::Round($Snapshot.Rate503,4)) > max $($thresholds.max503Rate)"
+    }
+    if ($Snapshot.P95 -gt $thresholds.maxP95Seconds) {
+        $violations += "p95 $([math]::Round($Snapshot.P95,4))s > max $($thresholds.maxP95Seconds)s"
+    }
+    if ($Snapshot.Ready -lt $thresholds.minReadySum) {
+        $violations += "ready sum $([math]::Round($Snapshot.Ready,2)) < min $($thresholds.minReadySum)"
+    }
+    $ok = ($violations.Count -eq 0)
+    $status = if ($ok) { 'PASS' } else { 'FAIL' }
+    $summary = "status=$status success_ratio=$([math]::Round($ratio,4)) rate503=$([math]::Round($Snapshot.Rate503,4)) p95=$([math]::Round($Snapshot.P95,4))s ready=$([math]::Round($Snapshot.Ready,2)) violations=$(if ($violations.Count) { ($violations -join '; ') } else { '-' })"
+    return @{ Ok = $ok; Violations = $violations; Summary = $summary; SuccessRatio = $ratio }
+}
+
+function Invoke-CosignContainer([string[]]$Arguments, [string]$WorkDirectory, [switch]$AllowFailure, [string]$CosignPassword) {
+    $dockerArgs = @(
+        'run', '--rm',
+        '-v', '/var/run/docker.sock:/var/run/docker.sock',
+        '-v', "${WorkDirectory}:/work",
+        '-w', '/work'
+    )
+    if ($CosignPassword) {
+        $dockerArgs += '-e', "COSIGN_PASSWORD=$CosignPassword"
+    }
+    $dockerArgs += $cosignImage
+    $dockerArgs += $Arguments
+    & docker @dockerArgs
+    if (-not $AllowFailure -and $LASTEXITCODE -ne 0) {
+        throw "cosign failed with exit code $LASTEXITCODE."
+    }
+    return $LASTEXITCODE
 }
 
 function Set-LabFault([int]$LatencyMs, [int]$ErrorPercent) {
@@ -155,7 +223,8 @@ function Invoke-LabBuild([string]$Tag, [string]$AppVersion, [string]$VcsRef) {
         '--build-arg', "APP_VERSION=$AppVersion",
         '--build-arg', "VCS_REF=$VcsRef",
         '--tag', $Tag,
-        (Join-Path $repository 'lab/app')
+        '-f', (Join-Path $repository 'lab/app/Dockerfile'),
+        (Join-Path $repository 'lab')
     )
 }
 
@@ -163,10 +232,10 @@ function Save-RolloutSnapshot([string]$Directory, [string]$Label) {
     $path = Join-Path $Directory "$Label.txt"
     $lines = @(
         "=== $Label UTC $((Get-Date).ToUniversalTime()) ===",
-        (($Invoke-Kubectl @('get', 'deployment/lab-http', '-o', 'wide')) -join "`n"),
-        (($Invoke-Kubectl @('get', 'rs', '-l', 'app.kubernetes.io/name=lab-http', '-o', 'wide')) -join "`n"),
-        (($Invoke-Kubectl @('get', 'pods', '-l', 'app.kubernetes.io/name=lab-http', '-o', 'wide')) -join "`n"),
-        (($Invoke-Kubectl @('rollout', 'history', 'deployment/lab-http')) -join "`n")
+        ((Invoke-Kubectl @('get', 'deployment/lab-http', '-o', 'wide')) -join "`n"),
+        ((Invoke-Kubectl @('get', 'rs', '-l', 'app.kubernetes.io/name=lab-http', '-o', 'wide')) -join "`n"),
+        ((Invoke-Kubectl @('get', 'pods', '-l', 'app.kubernetes.io/name=lab-http', '-o', 'wide')) -join "`n"),
+        ((Invoke-Kubectl @('rollout', 'history', 'deployment/lab-http')) -join "`n")
     )
     Set-Content -Path $path -Value ($lines -join "`n`n") -Encoding utf8
 }
@@ -265,6 +334,59 @@ function Assert-OwnedObjects {
 
 if ($Action -eq 'build') {
     Invoke-LabBuild $image '0.1.0' 'lab'
+    exit 0
+}
+
+if ($Action -eq 'verify-provenance-lab') {
+    Invoke-Tool 'docker' @('image', 'inspect', $image) | Out-Null
+    $runId = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
+    $runDir = Join-Path $provenanceEvidenceRoot $runId
+    New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+    $inspectRaw = Invoke-Tool 'docker' @('image', 'inspect', $image, '--format', '{{json .}}')
+    $inspect = ($inspectRaw -join "`n") | ConvertFrom-Json
+    $repoDigest = @($inspect.RepoDigests)[0]
+    $digestHex = $null
+    if ($repoDigest -match '@sha256:([a-f0-9]{64})$') {
+        $digestHex = $Matches[1]
+    } else {
+        $id = [string]$inspect.Id
+        if ($id -match '^sha256:([a-f0-9]{64})$') { $digestHex = $Matches[1] }
+    }
+    Assert-Condition ([bool]$digestHex) 'Could not resolve image digest from docker inspect.'
+    $digestLine = "sha256:$digestHex"
+    $digestFile = Join-Path $runDir 'artifact.digest'
+    Set-Content -Path $digestFile -Value $digestLine -Encoding ascii -NoNewline
+    $cosignPass = 'lab-local-ephemeral'
+    Invoke-CosignContainer @('generate-key-pair') $runDir -CosignPassword $cosignPass
+    Invoke-CosignContainer @(
+        'sign-blob', '--key', 'cosign.key', '--bundle', 'bundle.json', '--yes',
+        '--tlog-upload=false', 'artifact.digest'
+    ) $runDir -CosignPassword $cosignPass
+    Invoke-CosignContainer @(
+        'verify-blob', '--key', 'cosign.pub', '--bundle', 'bundle.json',
+        '--insecure-ignore-tlog=true', 'artifact.digest'
+    ) $runDir
+    New-Item -ItemType Directory -Force -Path (Join-Path $runDir 'wrong-key') | Out-Null
+    $wrongDir = Join-Path $runDir 'wrong-key'
+    Invoke-CosignContainer @('generate-key-pair') $wrongDir -CosignPassword 'lab-local-ephemeral-wrong'
+    $verifyWrong = Invoke-CosignContainer @(
+        'verify-blob', '--key', 'cosign.pub', '--bundle', 'bundle.json',
+        '--insecure-ignore-tlog=true', 'artifact.digest'
+    ) $wrongDir -AllowFailure
+    Assert-Condition ($verifyWrong -ne 0) 'Expected cosign verify-blob to fail with non-matching public key.'
+    $summary = @"
+# Provenance lab execution summary
+
+- UTC: $runId
+- Source image: $image
+- Signed artifact: digest $digestLine (sign-blob + bundle.json)
+- Cosign: $cosignImage (ephemeral key in evidence dir)
+- Sign+verify-blob: PASS on matching key; verify with wrong key: FAIL (exit $verifyWrong)
+- Not OCIR/OKE image signature; consumer must match digest before deploy (see release reference workflow).
+- Evidence: $runDir
+"@
+    Set-Content -Path (Join-Path $runDir 'execution-summary.md') -Value $summary -Encoding utf8
+    Write-Host $summary
     exit 0
 }
 
@@ -480,6 +602,77 @@ if ($Action -eq 'verify-rollout-lab') {
     Set-Content -Path (Join-Path $runDir 'execution-summary.md') -Value $summary -Encoding utf8
     Write-Host $summary
     Write-Host 'Rollout/rollback lab verified; environment restored to healthy baseline.'
+    exit 0
+}
+
+if ($Action -eq 'verify-slo-lab') {
+    Assert-LabCluster $true
+    Assert-Condition $namespaceExists "Namespace $namespace does not exist; deploy the lab first."
+    Assert-Condition (Assert-OwnedObservability) 'Prometheus and lab-http are required for SLI/SLO queries.'
+    $runId = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
+    $runDir = Join-Path $sloEvidenceRoot $runId
+    New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+    $logLines = @()
+    $sloFailed = $false
+    try {
+        Set-LabFault 0 0
+        Invoke-LabTraffic 40
+        Start-Sleep -Seconds 28
+        $baseline = Get-LabSLISnapshot
+        $baselineEval = Test-LabSLOSnapshot $baseline
+        $logLines += "phase=baseline $($baselineEval.Summary)"
+        Write-Host $logLines[-1]
+        if (-not $baselineEval.Ok) {
+            $sloFailed = $true
+            throw "Baseline SLO objectives not met: $(($baselineEval.Violations -join '; '))"
+        }
+        Set-LabFault $faultLatencyMs $faultErrorPercent
+        Invoke-LabTraffic 100
+        Start-Sleep -Seconds 32
+        $fault = Get-LabSLISnapshot
+        $faultEval = Test-LabSLOSnapshot $fault
+        $logLines += "phase=fault $($faultEval.Summary)"
+        Write-Host $logLines[-1]
+        Assert-Condition (-not $faultEval.Ok) 'Expected at least one SLO violation during controlled fault injection.'
+        Set-LabFault 0 0
+        Start-Sleep -Seconds 130
+        Invoke-LabTraffic 50
+        Start-Sleep -Seconds 35
+        $recovery = Get-LabSLISnapshot
+        $recoveryEval = Test-LabSLOSnapshot $recovery
+        $logLines += "phase=recovery $($recoveryEval.Summary)"
+        Write-Host $logLines[-1]
+        if (-not $recoveryEval.Ok) {
+            $sloFailed = $true
+            throw "Recovery SLO objectives not met: $(($recoveryEval.Violations -join '; '))"
+        }
+        Invoke-Kubectl @('rollout', 'status', 'deployment/lab-http', '--timeout=180s') | Out-Null
+        Assert-Condition (Wait-LabReadyPodCount 2 120) 'Expected two Ready replicas after SLO lab.'
+    } catch {
+        $sloFailed = $true
+        throw
+    } finally {
+        try { Set-LabFault 0 0 } catch { Write-Host "Warning: fault-off during cleanup failed: $_" }
+    }
+    if ($sloFailed) { exit 1 }
+    $sloCfg = Get-LabSLOThresholds
+    $summary = @"
+# SLO lab execution summary
+
+- UTC: $runId
+- Cluster: $context / namespace $namespace
+- Objectives: local demonstrative (see lab/runbooks/sli-slo-lab.md)
+- Config: lab/config/slo.json
+- Thresholds: success>=$($sloCfg.minSuccessRatio) rate503<=$($sloCfg.max503Rate) p95<=$($sloCfg.maxP95Seconds)s ready>=$($sloCfg.minReadySum)
+- Phases:
+$(($logLines | ForEach-Object { "  - $_" }) -join "`n")
+- Final: fault off, 2/2 Ready target
+- Evidence: $runDir
+"@
+    Set-Content -Path (Join-Path $runDir 'execution-summary.md') -Value $summary -Encoding utf8
+    Set-Content -Path (Join-Path $runDir 'slo-phases.log') -Value ($logLines -join "`n") -Encoding utf8
+    Write-Host $summary
+    Write-Host 'SLO lab verified: baseline pass, fault degrades, recovery pass.'
     exit 0
 }
 
