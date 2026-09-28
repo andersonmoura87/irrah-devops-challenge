@@ -1,9 +1,15 @@
 # Bootstrap das validações locais
 
-Esta página descreve o hardening P0. Não existe ainda laboratório Kubernetes,
-aplicação, imagem de container ou stack de observabilidade executável neste
-repositório. O [plano](hardening/HARDENING-PLAN.md) separa essas próximas etapas da
-fundação OCI original. `RESPOSTAS.md` continua registrando a entrega do desafio.
+Esta página descreve o **hardening P0** (validações Terraform, digest e
+documentação) tal como foi definido na iteração original. O **laboratório
+operacional P1** (`lab/`, `scripts/lab.ps1`) foi implementado **depois** dessa
+fundação; não faz parte do escopo P0 abaixo, mas já existe no repositório para
+execução local. O [plano](hardening/HARDENING-PLAN.md) separa P0, P1, P2 e
+OCI-ONLY. `RESPOSTAS.md` registra a entrega do desafio e referências ao lab
+quando aplicável.
+
+Laboratório local **≠** OKE, OCIR, Vault ou produção; ver
+[OCI-VALIDATION-GAPS.md](hardening/OCI-VALIDATION-GAPS.md).
 
 ## Pré-requisitos e versões
 
@@ -88,16 +94,40 @@ ou kubeconfig para relatórios versionados. `.terraform/` é cache local ignorad
 - **Link falha:** revisar origem/destino e capitalização para runners Linux;
   não apagar documentação para silenciar o verificador.
 
-Não há comando de destruição de laboratório nesta fase: nenhum cluster/container
-foi criado por este bootstrap. Para limpar resultados/cache, identificar primeiro
-os caminhos gerados, confirmar que ficam dentro deste checkout e que não contêm
+O bootstrap P0 **não** cria cluster Kubernetes nem containers de aplicação. Para
+limpar resultados/cache das validações P0, identificar primeiro os caminhos
+gerados, confirmar que ficam dentro deste checkout e que não contêm
 state/material necessário; não usar limpeza recursiva genérica como `git clean -xfd`.
 
-## Execução futura do laboratório
+## Laboratório operacional (P1)
 
-A fase P1 ainda depende de implementação e validação. Seu bootstrap deverá
-documentar versões, capacidade local, criação, smoke tests, fault injection e
-limpeza por nomes explícitos. Não há comando de laboratório funcional a executar
-agora. PostgreSQL local não validará PostgreSQL gerenciado; Kubernetes local não
-validará OKE, Vault, OCIR ou federação. Essas lacunas estão em
+O P1 acrescenta evidência operacional **local** (kind, métricas, gates de
+segurança, cenários controlados). Entry point: **`scripts/lab.ps1`**, que exige
+**PowerShell** (no Windows nativo; em Linux/macOS, PowerShell Core instalado).
+O script **não** cria o cluster kind; pressupõe um cluster existente conforme
+documentado nos runbooks (por exemplo `kind-irrah-lab-133`).
+
+Artefatos versionados (visão geral):
+
+| Área | Caminho |
+| --- | --- |
+| Aplicação e imagem | `lab/app/` (Go, `Dockerfile`; tags documentadas nos runbooks) |
+| Manifests Kubernetes | `lab/k8s/` (namespace, workload, observabilidade) |
+| Observabilidade | `lab/observability/README.md`, `lab/k8s/observability.yaml` |
+| Security gates (Trivy/SBOM) | `lab/security/README.md` |
+| Runbooks | `lab/runbooks/` (fault injection, rolling update/rollback) |
+
+Ações típicas (consulte `-Action` no script; lista completa no próprio
+`scripts/lab.ps1`): `build`, `load`, `deploy`, `verify`, `deploy-obs`,
+`verify-obs`, `scan-security`, `verify-fault-lab`, `verify-rollout-lab`, `down`,
+`down-obs`, `fault-on` / `fault-off`. Detalhes, políticas e limites ficam nos
+READMEs e runbooks do `lab/` — este bootstrap não substitui essa documentação.
+
+Evidência bruta de execuções (relatórios Trivy, snapshots de rollout, etc.)
+deve ir para **`/.evidence/`** (gitignored). Relatórios versionados só com dados
+sanitizados; o [registro de evidências](hardening/OPERATIONAL-EVIDENCE.md)
+diferencia artefato versionado, execução local e lacunas OCI.
+
+PostgreSQL local **não** faz parte do lab atual no repositório. Kubernetes local
+não valida OKE, Vault, OCIR ou federação. Essas lacunas permanecem em
 [OCI-VALIDATION-GAPS.md](hardening/OCI-VALIDATION-GAPS.md).

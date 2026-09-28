@@ -11,8 +11,9 @@ de cada execução nem o histórico da entrega original.
 | --- | --- | --- |
 | Estática | Diff, configuração, links e revisão de claims | Não comprova integração/runtime |
 | Local P0 | fmt, init readonly, validate, planos mock, testes dos scripts | Não autentica nem provisiona OCI |
-| Local P1 | Build/scan/SBOM, rollout, métricas e fault injection reais do lab | Ainda não implementado/executado nesta fase |
-| OCI-ONLY | Respostas e auditoria reais de integrações autorizadas | Não executado nesta branch |
+| Local P1 | Artefatos em `lab/` + ações `scripts/lab.ps1` (build, deploy, scan, rollout, fault, observabilidade) | Laboratório **local**; não valida OKE/OCIR/produção; PostgreSQL P1 **não** implementado no repo |
+| Evidência bruta P1 | Saídas em `/.evidence/` (gitignored), p.ex. security gates e rollout | Não versionada por padrão; não substitui registro sanitizado aqui |
+| OCI-ONLY | Respostas e auditoria reais de integrações autorizadas | Não executado; exige ambiente OCI real |
 
 ## Contrato de cada execução
 
@@ -43,12 +44,36 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | P0-DIGEST | Casos válidos e inválidos do validador | A consolidar com resultado dos testes |
 | P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | A consolidar; verificador não prova veracidade dos claims |
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
-| P1-LAB | Build/scan/SBOM, aplicação, Kubernetes, PostgreSQL, métricas, rollout/rollback e fault injection | Não implementado/não executado nesta fase |
+| P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
 | OCI | Casos de [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Não executados; exigem ambiente OCI real |
 
 Se uma validação não puder ser executada, registrar como **bloqueada**, sem
 transformar inspeção de código em sucesso de runtime. O relatório final deve
 distinguir execução local de execução do workflow no GitHub.
+
+### P1-LAB: artefatos, execução e consolidação
+
+Interpretação obrigatória (não misturar camadas):
+
+| Dimensão | O que o repositório sustenta | O que **não** afirmar sem registro |
+| --- | --- | --- |
+| **(a) Artefatos versionados** | `lab/app`, `lab/k8s`, runbooks, `lab/security/README.md`, `lab/observability/README.md`, `scripts/lab.ps1` com ações documentadas nos runbooks | Que uma execução específica ocorreu em CI ou OCI |
+| **(b) Verificações locais** | Podem ser disparadas pelo operador (`verify`, `scan-security`, `verify-fault-lab`, `verify-rollout-lab`, etc.) em kind + Docker | Sucesso universal ou equivalência a produção |
+| **(c) Evidência bruta** | Diretório `/.evidence/` (subpastas p.ex. lab-security, lab-rollout) — ignorado pelo Git | Versionar JSON/SBOM completos ou digests como prova oficial neste arquivo |
+| **(d) OCI/OKE/produção** | Lacunas em [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Validar OCIR, OKE, Vault ou PostgreSQL gerenciado via kind local |
+
+| Escopo P1 | Artefato no repo | Execução local (script/runbook) | Registro consolidado neste doc |
+| --- | --- | --- | --- |
+| Build / smoke HTTP | Sim | `build`, `load`, `deploy`, `verify` | **A consolidar** por operador (sem timestamps/digests inventados aqui) |
+| Trivy + SBOM + gate High/Critical | Sim (`lab/security/`) | `scan-security` | **A consolidar**; detalhes em `/.evidence/lab-security/` quando existir |
+| Observabilidade Prom/Grafana | Sim | `deploy-obs`, `verify-obs` | **A consolidar** |
+| Fault injection / recuperação | Sim | `verify-fault-lab`, runbook | **A consolidar** |
+| Rolling update / rollback | Sim | `verify-rollout-lab`, runbook | **A consolidar** |
+| PostgreSQL local P1 | **Não** | — | **Não aplicável** até haver artefatos no repo |
+
+Este documento **não** lista resultados de scan (contagens CVE, exit code de gate,
+révisions de Deployment) enquanto não forem transcritos de forma sanitizada a
+partir de uma execução real registrada nos campos do contrato acima.
 
 ## Retenção e conteúdo seguro
 
@@ -62,7 +87,9 @@ plan sensível, kubeconfig ou logs de conversas. Evitar ambiente completo e
 debug de SDK em logs compartilhados. Metadados como OCIDs/topologia também
 exigem avaliação antes de divulgação. Hash não torna material secreto público.
 
-No P1, cada teste operacional deverá vincular commit, digest/plataforma,
-configuração, tráfego/carga, janela UTC e sinais antes/durante/depois. Arquivos de
+No P1, cada teste operacional **deve** vincular commit, digest/plataforma quando
+houver, configuração, tráfego/carga, janela UTC e sinais antes/durante/depois —
+preenchidos pelo executor; não usar valores estimados neste registro. Arquivos de
 dashboard ou screenshots sem dados identificáveis não demonstram recuperação.
-Os cenários terão identificação explícita de **laboratório com fault injection**.
+Os cenários devem identificar explicitamente **laboratório local** (incluindo fault
+injection quando aplicável).

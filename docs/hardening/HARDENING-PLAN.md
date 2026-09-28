@@ -3,14 +3,18 @@
 ## Objetivo e fronteira desta iteração
 
 Preservar a entrega original e tornar seus contratos locais mais verificáveis,
-sem reescrever a prova. Esta iteração autoriza **somente P0.1 a P0.7**. P1, P2 e
-OCI-ONLY são backlog: não representam recursos criados nem testes executados.
+sem reescrever a prova. A **iteração P0** documentada nesta tabela autorizou
+**somente P0.1 a P0.7** — registro histórico da fundação, não reescrito como se
+P1 já existisse na mesma entrega. O **laboratório P1** foi implementado
+**posteriormente** em `lab/` e `scripts/lab.ps1`; P2 e OCI-ONLY seguem como fases
+separadas quando aplicável.
+
 O [README original](../../README.md) permanece a fonte das obrigações da IRRAH;
 este hardening é uma decisão posterior do projeto.
 
-P0 trata inconsistências e controles da fundação existente; P1 acrescentará
-evidência operacional local; P2 depende de necessidade demonstrada; OCI-ONLY
-precisa de ambiente OCI real e não será executado nesta branch.
+P0 trata inconsistências e controles da fundação existente; P1 acrescenta
+evidência operacional local (parcialmente implementada — ver status abaixo); P2
+depende de necessidade demonstrada; OCI-ONLY precisa de ambiente OCI real.
 
 ## P0: contratos desta mudança
 
@@ -27,18 +31,30 @@ precisa de ambiente OCI real e não será executado nesta branch.
 Esses são critérios de aceite, não um relatório de execução. Os resultados e
 eventuais limitações pertencem a [OPERATIONAL-EVIDENCE.md](OPERATIONAL-EVIDENCE.md).
 
-## Backlog posterior, sem implementação nesta fase
+## Status P1 (implementação posterior ao P0)
+
+Itens originalmente listados como backlog P1. **Status no repositório** (artefatos
+versionados); execuções locais e consolidação formal pertencem a
+[OPERATIONAL-EVIDENCE.md](OPERATIONAL-EVIDENCE.md) — sem presunção de sucesso
+retroativo na iteração P0.
+
+| Item P1 | Artefatos / escopo | Status no repo |
+| --- | --- | --- |
+| Aplicação mínima e imagem (`lab-http`, build por digest/tag documentada) | `lab/app/`, `Dockerfile`; `scripts/lab.ps1` (`build`, `load`, `verify`) | **Implementado** (artefatos); execução local pelo operador |
+| Kubernetes local (**kind**): Deployment, Service, SA, probes, limits, shutdown gracioso | `lab/k8s/workload.yaml`, `namespace.yaml`; script não cria o cluster | **Implementado** (manifests + automação); cluster kind pré-existente |
+| Rollout / rollback sob controle | `lab/runbooks/rolling-update-rollback.md`; `verify-rollout-lab` | **Implementado** (runbook + ação script) |
+| Prometheus / Grafana mínimos; métricas HTTP do lab | `lab/k8s/observability.yaml`, `lab/observability/README.md` | **Implementado**; métricas de **banco** não aplicáveis (sem PostgreSQL no lab) |
+| Trivy, gate High/Critical, SBOM CycloneDX | `lab/security/README.md`, [SECURITY-GATES.md](SECURITY-GATES.md); `scan-security` | **Implementado** (fluxo local documentado); evidência bruta em `/.evidence/` |
+| Fault injection 5xx/latência e recuperação | Env no Deployment, `lab/runbooks/fault-injection-troubleshooting.md`; `verify-fault-lab` | **Implementado** (mecanismo + cenário script) |
+| PostgreSQL local com role restrita e secret fora do Git | — | **Não implementado**; sem manifests, app ou script correspondente no repo |
+
+## Backlog P2 e OCI-ONLY (fases futuras)
 
 | Prioridade | Entrega proposta / valor | Dependências e critério de conclusão | Risco de excesso |
 | --- | --- | --- | --- |
-| P1 | Aplicação mínima de laboratório e imagem com build identificável por digest | P0 concluído; build repetível, smoke test e vínculo commit/imagem/plataforma registrados | Não recriar a aplicação WhatsApp nem seu domínio de negócio |
-| P1 | Um Kubernetes local: **kind**; Deployment, Service, ServiceAccount, probes, requests/limits e shutdown gracioso | Runtime de containers disponível; rollout e rollback realmente executados sob tráfego controlado | Um cluster é suficiente para evidência local; não simula isolamento OCI |
-| P1 | PostgreSQL local com role de aplicação restrita e secret fora do Git | Caso mínimo da aplicação; acesso permitido e proibido demonstrados, healthcheck e conexões observados | Não criar operador nem tratar esse banco como OCI gerenciado |
-| P1 | Prometheus/Grafana mínimos com métricas HTTP e Kubernetes; métricas do banco quando instrumentadas | Aplicação e cluster; dados reais do lab para RPS, 5xx, p95, CPU, memória e restarts, sem inventar métricas ausentes | Sem stack de logs/tracing completa por padrão |
-| P1 | Trivy sobre imagem construída, política Critical/High, SBOM e retenção de evidência | Build/digest; scanner e política com casos positivos/negativos; [contrato dos gates](SECURITY-GATES.md) | Um scanner, sem adicionar ferramenta equivalente |
-| P1 | Fault injection controlada de 5xx/latência, investigação e recuperação | Métricas e carga delimitada; antes/durante/depois e mitigação reversível registrados | Não apresentar como incidente real de produção; pressão de recurso exige limite seguro |
 | P2 | Assinatura/proveniência e controles adicionais de disponibilidade | Somente se resolverem necessidade identificada; consumidor valida o controle | Não acrescentar ferramentas apenas para assinar um artefato sem verificação |
 | OCI-ONLY | Nove casos de integração OCI, incluindo identidade, banco e deploy | Conta/rede/IAM autorizados; [critérios separados](OCI-VALIDATION-GAPS.md) | Não adaptar a arquitetura à Free Tier nem chamar testes locais de prova OCI |
+| P1 (restante) | PostgreSQL local conforme linha acima | Depende de caso mínimo de app + credenciais fora do Git | Não tratar como OCI Database gerenciado |
 
 ## Decisões mantidas e qualificações
 
@@ -64,9 +80,11 @@ utilidade/alcançabilidade precisa de diagnóstico na topologia OCI efetiva.
 2. P0.3: centralizar digest estrito e provar rejeições sem publicar imagens.
 3. P0.4/P0.5: explicitar KMS/rede sem alterar arquitetura.
 4. P0.6/P0.7: conferir documentação, links, diretórios locais e evidências.
-5. Revisar diff e resultados; encerrar P0. A implementação de P1 depende de nova
-   autorização; iniciar pelo build/app, depois kind/banco, observabilidade,
-   security gates e cenários de falha. P2/OCI-ONLY permanecem separados.
+5. Revisar diff e resultados; encerrar P0 (iteração original).
+
+Após P0, o laboratório P1 foi desenvolvido em etapas (`lab/`, `scripts/lab.ps1`).
+Itens P1 ainda em aberto no repositório incluem **PostgreSQL local**. P2 e
+OCI-ONLY permanecem separados e não substituídos por execução kind local.
 
 P0 está integralmente validado quando os checks exigidos passam, os resultados
 são rastreáveis, nenhum controle proposto é apresentado como executado e o diff
