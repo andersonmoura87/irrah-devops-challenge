@@ -14,7 +14,7 @@ de cada execução nem o histórico da entrega original.
 | Local P1 | Artefatos em `lab/` + ações `scripts/lab.ps1` (build, deploy, scan, rollout, fault, observabilidade) | Laboratório **local**; não valida OKE/OCIR/produção; PostgreSQL P1 **não** implementado no repo |
 | Local P2 | SLI/SLO (`verify-slo-lab`) e proveniência Cosign (`verify-provenance-lab`) | Objetivos **demonstrativos**; Cosign **não** prova OCIR/OKE |
 | Evidência bruta P1/P2 | Saídas em `/.evidence/` (gitignored), p.ex. lab-security, lab-rollout, lab-slo, lab-provenance | Não versionada por padrão; não substitui registro sanitizado aqui |
-| OCI-ONLY | Respostas e auditoria reais de integrações autorizadas | Não executado; exige ambiente OCI real |
+| OCI-ONLY | Respostas e auditoria reais de integrações autorizadas | Maioria **não executada**; **OCI-08** parcialmente exercido e **bloqueado** (capacidade A1); OKE **não** operacional para workload |
 
 ## Contrato de cada execução
 
@@ -48,7 +48,8 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
 | P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | A consolidar; thresholds versionados em runbook/`slo.go`, não SLA produção |
 | P2-PROVENANCE | `verify-provenance-lab`; Cosign sign+verify local | A consolidar; chaves em `/.evidence/`; OCIR **não** validado |
-| OCI | Casos de [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Não executados; exigem ambiente OCI real |
+| OCI | Casos OCI-01–07, OCI-09 em [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Não executados nesta iteração |
+| OCI-08 | OKE / workers / deploy (ver registro abaixo) | **Bloqueado** — execução parcial 2026-09-29; ver detalhe sanitizado |
 
 Se uma validação não puder ser executada, registrar como **bloqueada**, sem
 transformar inspeção de código em sucesso de runtime. O relatório final deve
@@ -87,6 +88,17 @@ partir de uma execução real registrada nos campos do contrato acima.
 
 Mesmas regras de campos (UTC real, commit, versões de ferramentas) aplicam-se a P2.
 Não preencher métricas SLI ou exit codes neste arquivo sem transcrição de execução.
+
+### OCI-08 — registro sanitizado (2026-09-29)
+
+| Campo | Conteúdo |
+| --- | --- |
+| Resultado | **Bloqueado** (não aprovado; OKE **não** operacional para carga) |
+| Causa observada | **OUT_OF_HOST_CAPACITY** / **Out of host capacity** na criação de instâncias **VM.Standard.A1.Flex** (node pool); Capacity Report A1 **OUT_OF_HOST_CAPACITY** nos três Fault Domains consultados em **sa-saopaulo-1** |
+| Escopo efetivamente testado | Provisionamento do control plane (**ACTIVE**); criação do managed node pool A1 (1 OCPU, 6 GB); falha **NODEPOOL_CREATE** / **LaunchInstance**; Compute Capacity Report para A1 (FD-1, FD-2, FD-3); investigação documental/capacity de **VM.Standard.A2.Flex** (suporte OKE e imagens aarch64 confirmados; A2 **AVAILABLE** só em FD-1; **não** provisionado — premissa de custo) |
+| O que **não** foi validado | Workers Ready; DNS de pods; pull OCIR; deploy/rollout/smoke/rollback; PostgreSQL gerenciado; demais integrações OCI-01–07; **Terraform/IAM/rede end-to-end** como prova desta execução (permanece configuração declarada + este bloqueio de runtime) |
+| Evidência bruta | Console/OCI CLI/Capacity Report — **não** versionada aqui; sem OCIDs completos neste registro |
+| Próximo passo | Repetir quando houver capacidade A1 (ou decisão explícita de shape/custo alternativo) e então executar critérios pendentes de OCI-08 |
 
 ## Retenção e conteúdo seguro
 
