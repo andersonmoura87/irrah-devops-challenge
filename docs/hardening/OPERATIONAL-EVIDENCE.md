@@ -43,7 +43,7 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | --- | --- | --- |
 | P0-TF | fmt; init readonly e validate nos três roots; testes mock | **Aprovado** (validação local Q1); registro sanitizado abaixo; mocks **não** validam OCI real |
 | P0-DIGEST | Casos válidos e inválidos do validador | **Aprovado** (validação local do contrato); registro sanitizado abaixo; **não** comprova runtime OCI |
-| P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | A consolidar; verificador não prova veracidade dos claims |
+| P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | **Aprovado** (validação local); registro sanitizado abaixo; verificador **não** prova veracidade dos claims |
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
 | P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
 | P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; thresholds versionados em runbook/`slo.go`; **não** SLA de produção; OCI/OKE **não** validados |
@@ -55,7 +55,7 @@ Se uma validação não puder ser executada, registrar como **bloqueada**, sem
 transformar inspeção de código em sucesso de runtime. O relatório final deve
 distinguir execução local de execução do workflow no GitHub.
 
-P0-TF e P0-DIGEST estão transcritos nas subseções seguintes. Demais itens P0 permanecem
+P0-TF, P0-DIGEST e P0-DOCS estão transcritos nas subseções seguintes. **P0-SCOPE** permanece
 **a consolidar** até execução registrada da mesma forma.
 
 ### P0-TF — registro sanitizado (Q1 Terraform local)
@@ -96,6 +96,27 @@ working tree.
 | Integração declarada (repo) | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) executa `scripts/test-digest.sh`; [`.github/workflows/release.yml`](../../.github/workflows/release.yml) usa `scripts/validate-digest.sh` para validar `image_digest` — **sem** registro neste documento de run específico do GitHub Actions |
 | Resultado global | **Aprovado** para critério P0-DIGEST local (contrato + casos de teste) |
 | Limites | **Não** comprova build/push de imagem; **não** comprova publicação em OCIR; **não** comprova promoção real por digest; **não** comprova deploy em OKE; validação sintática **não** substitui evidência de runtime OCI |
+
+### P0-DOCS — registro sanitizado (validação documental local)
+
+Validação **local** do verificador de links Markdown e checagem de whitespace no
+diff. **0 errors** nos links locais **não** significa documentação perfeita nem claims
+verificados.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P0-DOCS; objetivo: exercitar o verificador de links locais, varrer Markdown do repo e `git diff --check` |
+| Ambiente | Node **v22.12.0** |
+| Entrada (testes) | `node --test scripts/check-markdown-links.test.mjs` — **6** passed, **0** failed (comportamento: paths relativos/raiz, imagens, títulos e reference definitions; falha com source/line para arquivo local ausente; URLs externas, anchors e exemplos de código fora do escopo de arquivo local; fragmentos/query só no destino arquivo; paths externos e encoding malformado falham; case mismatch e alvos ignorados/local-only não passam só em um OS) |
+| Entrada (varredura) | `node scripts/check-markdown-links.mjs` — **18** arquivos Markdown; **56** links locais; **0** errors (**URLs externas e anchors não verificados**) |
+| Entrada (whitespace) | `git diff --check` — **PASS** (sem saída; exit de sucesso) |
+| Working tree | Permaneceu **limpo** após a execução (`git status --short` sem saída) |
+| Artefatos versionados | `scripts/check-markdown-links.mjs`, `scripts/check-markdown-links.test.mjs` |
+| Integração declarada (repo) | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) executa `node --test scripts/check-markdown-links.test.mjs` e `node scripts/check-markdown-links.mjs` — **sem** registro neste documento de run específico do GitHub Actions |
+| Resultado global | **Aprovado** para critério P0-DOCS local (verificador + varredura + `git diff --check`) |
+| **Validado (local)** | Comportamento coberto pelos testes do verificador; links **locais** no escopo do script (**56** checados, **0** erros reportados); `git diff --check` |
+| **Não validado** | URLs externas; anchors; veracidade semântica dos claims; execução específica do workflow GitHub Actions; runtime ou provisionamento OCI; segurança/conformidade da infraestrutura |
+| Limites | Verificador comprova **existência/resolução local** conforme regras do script, não verdade do conteúdo nem disponibilidade de sites externos |
 
 ### P1-LAB: artefatos, execução e consolidação
 
