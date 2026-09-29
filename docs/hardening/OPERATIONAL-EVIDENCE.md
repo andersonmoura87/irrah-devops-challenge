@@ -41,7 +41,7 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 
 | ID | Verificação | Situação do registro |
 | --- | --- | --- |
-| P0-TF | fmt; init readonly e validate nos três roots; testes mock | A consolidar com saída real, versões e revisão validada |
+| P0-TF | fmt; init readonly e validate nos três roots; testes mock | **Aprovado** (validação local Q1); registro sanitizado abaixo; mocks **não** validam OCI real |
 | P0-DIGEST | Casos válidos e inválidos do validador | A consolidar com resultado dos testes |
 | P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | A consolidar; verificador não prova veracidade dos claims |
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
@@ -54,6 +54,29 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 Se uma validação não puder ser executada, registrar como **bloqueada**, sem
 transformar inspeção de código em sucesso de runtime. O relatório final deve
 distinguir execução local de execução do workflow no GitHub.
+
+P0-TF (Q1 Terraform) está transcrito na subseção seguinte. Demais itens P0 permanecem
+**a consolidar** até execução registrada da mesma forma.
+
+### P0-TF — registro sanitizado (Q1 Terraform local)
+
+Validação **local** da configuração Terraform da Q1. Provider OCI **mockado** em
+`terraform test`; sucesso **não** transforma mocks em evidência de recursos OCI reais.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P0-TF / Q1; objetivo: `init` (backend off, lockfile readonly), `validate` e `terraform test` nos três roots |
+| Código (base observado) | Commit **07a414d** (antes da consolidação documental deste registro) |
+| Ambiente | Terraform **1.16.2** (`windows_amd64`); provider **oracle/oci v7.22.0** (lockfile readonly reutilizado); execução local; **sem** `terraform apply`; **sem** recurso OCI provisionado |
+| Entrada | Por root: `terraform init -backend=false -lockfile=readonly` e `terraform validate`; `terraform test` nos arquivos de teste versionados |
+| `terraform/bootstrap-state` | init: **PASS**; validate: **PASS**; `tests/bootstrap.tftest.hcl`: `isolated_backend_contract` **PASS**, `reject_shared_state_group` **PASS** — **2** passed, **0** failed |
+| `terraform/environments/staging` | init: **PASS**; validate: **PASS**; `tests/q1.tftest.hcl`: `foundation_without_database`, `database_from_secret_reference`, `reject_admin_secret_in_workload`, `reject_unrestricted_admin_network` — **PASS**; `tests/root.tftest.hcl`: `staging_root_contract` — **PASS** — **5** passed, **0** failed |
+| `terraform/environments/production` | init: **PASS**; validate: **PASS**; `tests/root.tftest.hcl`: `production_root_contract` — **PASS** — **1** passed, **0** failed |
+| Total `terraform test` | **8** passed, **0** failed (inclui casos negativos que **devem** ser rejeitados pelo contrato — observados como **PASS** no teste) |
+| Resultado global | **Aprovado** para critério P0-TF local (configuração + contratos mockados) |
+| **Validado (local)** | Formatação/configuração Terraform exercitada via init readonly + validate nos três roots; contratos dos `terraform test`; **8** testes **PASS** / **0** **FAIL**; rejeições negativas esperadas nos testes de política |
+| **Não validado** | Backend remoto OCI real; IAM efetivo na OCI; criação real de VCN/OKE/PostgreSQL/Object Storage/Vault; conectividade; disponibilidade; comportamento multi-AZ; `terraform apply`; ambiente OCI operacional; conteúdo de `terraform.tfvars` ou identificadores de tenancy/compartment/grupos |
+| Limites | Mocks e `terraform test` comprovam **contratos declarados**, não runtime OCI; ver **OCI-08** e lacunas OCI para provisionamento real |
 
 ### P1-LAB: artefatos, execução e consolidação
 
