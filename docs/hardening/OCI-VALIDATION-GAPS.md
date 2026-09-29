@@ -1,8 +1,10 @@
 # Lacunas de validação OCI
 
-**Todos os casos desta página são OCI-ONLY e NÃO EXECUTADOS.** Testes Terraform
-mock, Kubernetes/PostgreSQL locais ou futuras credenciais fictícias não são
-substitutos dessas evidências. A arquitetura original permanece em
+**Casos OCI-ONLY** exigem ambiente OCI real; testes Terraform mock, Kubernetes/
+PostgreSQL locais ou credenciais fictícias **não** substituem essas evidências.
+Até **2026-09-29**, **OCI-01 a OCI-07 e OCI-09 permanecem não executados** neste
+repositório. **OCI-08** foi **parcialmente executado e bloqueado** (detalhe abaixo).
+A arquitetura original permanece em
 [Q1](../architecture/q1-iac-security.md) e [Q2](../architecture/q2-cicd-zero-downtime.md).
 
 ## Terminologia e pré-condições
@@ -50,7 +52,7 @@ Não adicionar NAT/IGW nem remover controles para converter falhas em aprovaçã
 | OCI-05 — Backup / restore drill — **não executado** | Backup diário parametrizado. Backup real concluído e restore em DB separado recuperam marcadores sintéticos, roles e integridade; medir duração/ponto recuperado | Origem permanece íntegra; destinos/credenciais não se confundem. Evidência inclui IDs distintos, verificações e limpeza autorizada, sem SLA/RPO/RTO presumidos |
 | OCI-06 — GitHub OIDC→OCI — **não executado** | Nenhum trust/job autenticador. Troca JWT→RPST pelo método escolhido e chamada API permitida; provar versões e tratamento seguro da credencial da troca | Claims incorretos, token expirado e caller não autorizado são rejeitados. Evidência distingue IAM/trust de Docker login, sem publicar JWT/RPST/chave |
 | OCI-07 — OCIR — **não executado** | Apenas referência Q2. Push restrito ao repo, pull por digest e comparação de plataforma/artefato; OKE obtém imagem privada por mecanismo aprovado | Outro repo/identidade sem grant são negados. Separar autenticação do push CI, pull pelo kubelet e SDK do pod; workload identity da app não prova pull |
-| OCI-08 — OKE / rede / deploy — **não executado** | Nodes completam bootstrap e ficam Ready; DNS funciona; pull e serviços OCI usam os caminhos permitidos via OSN. Validar PMTUD na topologia real; runner privado aplica digest e conclui rollout/smoke/rollback com IAM/RBAC mínimos | Destino externo sem rota, origem/ambiente/namespace indevido e acesso público não autorizado falham. Readiness falha impede aceite; registrar caminhos/regras e sintomas sem alegar disponibilidade garantida |
+| OCI-08 — OKE / rede / deploy — **parcialmente executado / bloqueado** | **Executado (2026-09-29):** control plane OKE provisionado e **ACTIVE**; tentativa de node pool gerenciado **VM.Standard.A1.Flex** (1 OCPU, 6 GB). **NODEPOOL_CREATE** falhou em **LaunchInstance** com **Out of host capacity**. **Compute Capacity Report** (região **sa-saopaulo-1**, três Fault Domains disponíveis no AD): **VM.Standard.A1.Flex** → **OUT_OF_HOST_CAPACITY** em FD-1, FD-2 e FD-3. **Nenhum worker A1** provisionado; **nenhum node Ready**. Cluster ACTIVE **≠** plataforma pronta para workload. **Investigado, não provisionado:** **VM.Standard.A2.Flex** listado entre shapes suportados pelo OKE; imagens OKE **aarch64** compatíveis existem; Capacity Report A2 → **AVAILABLE** em FD-1, **OUT_OF_HOST_CAPACITY** em FD-2 e FD-3; descartado nesta validação por alterar a premissa de custo do laboratório. **Ainda pendente (critérios futuros):** bootstrap Ready, DNS de pods, pull/serviços via OSN, PMTUD na topologia real, deploy por digest, rollout/smoke/rollback, testes negativos de rede/IAM | Destino externo sem rota, origem/ambiente/namespace indevido e acesso público não autorizado falham. Readiness falha impede aceite; registrar caminhos/regras e sintomas sem alegar disponibilidade garantida |
 | OCI-09 — Backend / bootstrap — **não executado** | Seed/import remoto preservam recursos sem recriação; executores próprios acessam seus buckets; lock impede dois escritores concorrentes; recuperar versão de state em ensaio isolado | Grupo de staging não acessa state production e vice-versa; sem permissão não lê/escreve/retira lock. Conferir lineage/serial e plano após recuperação; não publicar state nem forçar unlock de escritor ativo |
 
 ## Limites específicos preservados
