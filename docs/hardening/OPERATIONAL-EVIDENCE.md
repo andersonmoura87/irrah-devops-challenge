@@ -154,13 +154,12 @@ Interpretação obrigatória (não misturar camadas):
 | Trivy + SBOM + gate High/Critical | Sim (`lab/security/`) | `scan-security` | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; OCIR/OKE admission **não** validados |
 | Observabilidade Prom/Grafana | Sim | `deploy-obs`, `verify-obs` | **Aprovado** (lab local); registro sanitizado abaixo; OCI/OKE/produção **não** validados |
 | Fault injection / recuperação | Sim | `verify-fault-lab`, runbook | **Aprovado** (lab local); registro sanitizado abaixo; OCI/OKE/produção **não** validados |
-| Rolling update / rollback | Sim | `verify-rollout-lab`, runbook | **A consolidar** |
+| Rolling update / rollback | Sim | `verify-rollout-lab`, runbook | **Aprovado** (lab local); registro sanitizado abaixo; OCI/OKE/produção **não** validados |
 | PostgreSQL local P1 | **Não** | — | **Não aplicável** até haver artefatos no repo |
 
-Build / smoke HTTP, observabilidade Prom/Grafana e fault injection / recuperação estão
-transcritos nas subseções seguintes. O scan Trivy/SBOM/gate High–Critical (Q4) está
-transcrito na subseção dedicada abaixo. Rolling update / rollback permanece **a consolidar**
-até execução registrada nos campos do contrato acima.
+Build / smoke HTTP, observabilidade Prom/Grafana, fault injection / recuperação e rolling
+update / rollback estão transcritos nas subseções seguintes. O scan Trivy/SBOM/gate
+High–Critical (Q4) está transcrito na subseção dedicada abaixo.
 
 ### P1-LAB — build / smoke HTTP — registro sanitizado (laboratório local)
 
@@ -222,6 +221,28 @@ resiliência de infraestrutura cloud.
 | **Validado (local)** | Ciclo baseline → fault → recovery; taxa 503 e p95 elevados sob fault e normalizados após desativação do fault pelo script; rollout na ativação/remoção do fault; **2/2** réplicas Ready; checks HTTP in-pod (`/healthz`, `/readyz`, `/metrics`) conforme script; env de fault **zerada** ao final |
 | **Não validado** | OCI; OKE; multi-AZ; falha PostgreSQL; CPU/memória sob pressão real; falha de node; produção; SLA de produção; GitHub Actions; alert delivery; extrapolação kind → resiliência cloud |
 | Limites | Fault só em `GET /` (lab); limiares do script ≠ SLO produção; **sem** diretório `/.evidence/` dedicado neste cenário — registro sanitizado aqui |
+
+### P1-LAB — rolling update / rollback — registro sanitizado (laboratório local)
+
+Cenário `verify-rollout-lab` no kind (`kind-irrah-lab-133`, namespace `irrah-lab`).
+Registra **execução final bem-sucedida** (exit **0**); **não** equivale a deploy em OKE/OCI/produção.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P1-LAB; objetivo: rolling update saudável, rollout inválido contido, rollback e restauração do baseline |
+| Tempo (UTC) | Run **2026-09-29T08:24:21Z** (id de pasta de evidência bruta `20260929T082421Z`) |
+| Ação executada | `.\scripts\lab.ps1 verify-rollout-lab` — exit **0**; mensagem final: *Rollout/rollback lab verified; environment restored to healthy baseline.* |
+| Baseline | Imagem **irrah-lab-http:0.1.0**; Deployment **2/2** Ready; fault injection **off** |
+| Rolling update saudável | **0.1.0** → **0.1.1**; estratégia do cenário **maxUnavailable=0**, **maxSurge=1**; *Successful rolling update: continuity samples=45/45 versions seen: 0.1.1 lab_ready=2* |
+| Rollout inválido (deliberado) | `readinessProbe` → **`/readyz-broken`**; tráfego **permaneceu** disponível; rollout **não** saudável; **ProgressDeadlineExceeded** observado — *Failed rollout contained: deployment still serves traffic; stalled=True deadlineExceeded=True* |
+| Rollback / restauração | `kubectl rollout undo`; reaplicação **`lab/k8s/workload.yaml`**; imagem restaurada **0.1.0**; readiness **`/readyz`**; fault **off** |
+| Prometheus (final) | **2** targets `lab-http` **healthy/up** após convergência (validação com polling versionada no script) |
+| Estado final observado | Deployment **READY 2/2**, **UP-TO-DATE 2**, **AVAILABLE 2**, imagem **0.1.0**; dois pods **Running** **1/1**, zero restarts; ReplicaSet **0.1.1** DESIRED/CURRENT/READY **0**; ReplicaSet **0.1.0** **2/2/2**; EndpointSlice com **2** endpoints |
+| Evidência bruta (local) | `/.evidence/lab-rollout/20260929T082421Z/` — gitignored; **não** versionada |
+| Resultado global | **Aprovado** para critério P1 rolling update / rollback local |
+| **Validado (local)** | Continuidade HTTP **45/45** no rolling update; contenção do rollout inválido (serviço ainda responde, rollout stalled, deadline excedido); undo + manifest baseline; **2/2** Ready; retorno à **0.1.0**; targets Prometheus convergidos (**2** healthy); ambiente saudável ao final |
+| **Não validado** | OCI; OKE; produção; multi-node/multi-AZ; registry/OCIR; promoção real por digest; GitHub Actions; tráfego/carga de produção; SLA/disponibilidade de produção; rollback de banco; rollback de schema/migration; rollback de infraestrutura cloud |
+| Limites | kind **single-node**; tags **0.1.0** / **0.1.1** locais (kind load); demonstra o cenário versionado, **não** estratégia de deployment em produção |
 
 ### P1-LAB — scan Trivy/SBOM gate Q4 — registro sanitizado (2026-09-29T03:51:33Z)
 
