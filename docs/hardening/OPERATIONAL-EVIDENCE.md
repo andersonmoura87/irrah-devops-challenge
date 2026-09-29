@@ -150,16 +150,37 @@ Interpretação obrigatória (não misturar camadas):
 
 | Escopo P1 | Artefato no repo | Execução local (script/runbook) | Registro consolidado neste doc |
 | --- | --- | --- | --- |
-| Build / smoke HTTP | Sim | `build`, `load`, `deploy`, `verify` | **A consolidar** por operador (sem timestamps/digests inventados aqui) |
+| Build / smoke HTTP | Sim | `build`, `load`, `deploy`, `verify` | **Aprovado** (lab local); registro sanitizado abaixo; tag local **não** equivale a promoção por digest; OCI/OKE/CI **não** validados |
 | Trivy + SBOM + gate High/Critical | Sim (`lab/security/`) | `scan-security` | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; OCIR/OKE admission **não** validados |
 | Observabilidade Prom/Grafana | Sim | `deploy-obs`, `verify-obs` | **A consolidar** |
 | Fault injection / recuperação | Sim | `verify-fault-lab`, runbook | **A consolidar** |
 | Rolling update / rollback | Sim | `verify-rollout-lab`, runbook | **A consolidar** |
 | PostgreSQL local P1 | **Não** | — | **Não aplicável** até haver artefatos no repo |
 
-O scan Trivy/SBOM/gate High–Critical (Q4) está transcrito na subseção seguinte.
-Demais cenários P1 (build, observabilidade, fault, rollout) permanecem **a consolidar**
-até execução registrada nos campos do contrato acima.
+Build / smoke HTTP está transcrito na subseção seguinte. O scan Trivy/SBOM/gate
+High–Critical (Q4) está transcrito na subseção dedicada abaixo. Demais cenários P1
+(observabilidade, fault, rollout) permanecem **a consolidar** até execução registrada
+nos campos do contrato acima.
+
+### P1-LAB — build / smoke HTTP — registro sanitizado (laboratório local)
+
+Fluxo **local** Docker Desktop + kind (`kind-irrah-lab-133`). **Não** comprova GitHub
+Actions, OCIR, OKE, OCI nem produção; tag `irrah-lab-http:0.1.0` **não** substitui
+promoção imutável por digest.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P1-LAB; objetivo: construir imagem lab, carregar no kind, deploy e smoke HTTP in-cluster |
+| Ambiente | Docker **28.5.1**; kind **v0.33.0**; kubectl client **v1.34.1**; Kustomize **v5.7.1**; contexto **kind-irrah-lab-133** |
+| Ações executadas | `.\scripts\lab.ps1 build` → `.\scripts\lab.ps1 load` → `.\scripts\lab.ps1 deploy` → `.\scripts\lab.ps1 verify` — **sucesso** em sequência |
+| Build | Imagem **irrah-lab-http:0.1.0**; build concluído; gates do Dockerfile observados no build (**gofmt**, **go vet**, **go test**); digest/ID local da imagem **não** registrado aqui como evidência de promoção |
+| Deploy / rollout | Deployment **lab-http** rolled out com sucesso; estado final **READY 2/2**, **UP-TO-DATE 2**, **AVAILABLE 2**; imagem no Deployment: **irrah-lab-http:0.1.0**; desired=**2**, ready=**2** |
+| Smoke HTTP (`verify`) | `/healthz` → **HTTP 200**; `/readyz` → **HTTP 200**; `/metrics` → **HTTP 200**; verificações repetidas com sucesso; mensagem final observada: *Verified: two Ready pods, Service, dedicated ServiceAccount, restricted securityContext and in-cluster HTTP check.* |
+| Estado final observado | Dois pods **lab-http** **Running** **1/1**, zero restarts; **Service** `lab-http` ClusterIP porta **8080**; **ServiceAccount** `lab-http` com **0** secrets; `git status --short` sem saída após execução |
+| Resultado global | **Aprovado** para critério P1 build/smoke HTTP local |
+| **Validado (local)** | Pipeline build→load→deploy→verify no kind; rollout 2/2; probes HTTP in-cluster; securityContext restrito e ServiceAccount dedicada conforme saída do verify |
+| **Não validado** | GitHub Actions; push/pull em registry ou OCIR; deploy em OKE; runtime OCI; produção; SLA/disponibilidade de produção; observabilidade Prom/Grafana (pods podem existir no cluster — **não** consolida cenário observabilidade) |
+| Limites | Laboratório kind single-node; imagem por **tag** local; sem evidência de cadeia CI/CD ou digest promovido |
 
 ### P1-LAB — scan Trivy/SBOM gate Q4 — registro sanitizado (2026-09-29T03:51:33Z)
 
