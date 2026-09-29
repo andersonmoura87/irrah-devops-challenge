@@ -46,7 +46,7 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | A consolidar; verificador não prova veracidade dos claims |
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
 | P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
-| P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | A consolidar; thresholds versionados em runbook/`slo.go`, não SLA produção |
+| P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; thresholds versionados em runbook/`slo.go`; **não** SLA de produção; OCI/OKE **não** validados |
 | P2-PROVENANCE | `verify-provenance-lab`; Cosign sign+verify local | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; chaves/bundle em `/.evidence/` (gitignored); OCIR/OKE/Rekor **não** validados |
 | OCI | Casos OCI-01–07, OCI-09 em [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Não executados nesta iteração |
 | OCI-08 | OKE / workers / deploy (ver registro abaixo) | **Bloqueado** — execução parcial 2026-09-29; ver detalhe sanitizado |
@@ -87,8 +87,28 @@ partir de uma execução real registrada nos campos do contrato acima.
 | P2-PROVENANCE | `verify-provenance-lab` | Digest da imagem, versão Cosign, resultado verify OK + verify com chave errada FAIL | Assinatura OCIR validada ou Rekor/keyless |
 
 Mesmas regras de campos (UTC real, commit, versões de ferramentas) aplicam-se a P2.
-P2-PROVENANCE está transcrito na subseção seguinte. P2-SLO permanece **a consolidar**
-até execução registrada da mesma forma.
+P2-SLO e P2-PROVENANCE estão transcritos nas subseções abaixo (objetivos **demonstrativos**
+de laboratório; **não** SLA/SLO de produção da IRRAH).
+
+### P2-SLO — registro sanitizado (2026-09-29T04:37:06Z)
+
+Laboratório local em kind (`verify-slo-lab`). **Não** valida OCI, OKE, ambiente
+multi-AZ nem produção; thresholds citados são os do lab versionados no repositório.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P2-SLO; objetivo: medir SLIs em fases baseline → fault (injeção) → recovery e comparar aos limiares do lab |
+| Tempo (UTC) | Run principal **2026-09-29T04:37:06Z** (id de pasta de evidência `20260929T043706Z`) |
+| Ambiente | Cluster **kind-irrah-lab-133**; namespace **irrah-lab** |
+| Entrada | `.\scripts\lab.ps1 -Action verify-slo-lab` |
+| Limiares (lab) | `success_ratio` ≥ **0.92**; taxa **503** ≤ **0.04**; **p95** ≤ **0.12** s; réplicas **Ready** ≥ **1.9** |
+| Fase baseline | **PASS** — `success_ratio=1`, `rate503=0`, `p95=0.0048` s, `ready=2` |
+| Fase fault | **FAIL** (**esperado** pelo desenho do experimento) — `success_ratio=0.0297`, `rate503=0.8694`, `p95=0.48` s, `ready=2`; violações deliberadas dos limiares: success ratio **0.0297** (mín. **0.92**); taxa 503 **0.8694** (máx. **0.04**); p95 **0.48** s (máx. **0.12** s) — confirma detecção de degradação sob fault injection, não falha operacional do script |
+| Fase recovery | **PASS** — `success_ratio=1`, `rate503=0`, `p95=0.0048` s, `ready=2` |
+| Estado final | Fault **off**; **2/2** pods **Ready** |
+| Resultado global | **Aprovado** para o critério do lab (baseline e recovery passam; fault reprova os SLIs conforme esperado) |
+| Evidência bruta | `/.evidence/lab-slo/20260929T043706Z/` — local, gitignored; **não** versionar |
+| Limites | Sem validação em OCI/OKE/produção; limiares não são compromisso de SLA; kind single-node não representa multi-AZ |
 
 ### P2-PROVENANCE — registro sanitizado (2026-09-29T04:00:35Z)
 
