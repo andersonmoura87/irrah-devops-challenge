@@ -69,15 +69,37 @@ Interpretação obrigatória (não misturar camadas):
 | Escopo P1 | Artefato no repo | Execução local (script/runbook) | Registro consolidado neste doc |
 | --- | --- | --- | --- |
 | Build / smoke HTTP | Sim | `build`, `load`, `deploy`, `verify` | **A consolidar** por operador (sem timestamps/digests inventados aqui) |
-| Trivy + SBOM + gate High/Critical | Sim (`lab/security/`) | `scan-security` | **A consolidar**; detalhes em `/.evidence/lab-security/` quando existir |
+| Trivy + SBOM + gate High/Critical | Sim (`lab/security/`) | `scan-security` | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; OCIR/OKE admission **não** validados |
 | Observabilidade Prom/Grafana | Sim | `deploy-obs`, `verify-obs` | **A consolidar** |
 | Fault injection / recuperação | Sim | `verify-fault-lab`, runbook | **A consolidar** |
 | Rolling update / rollback | Sim | `verify-rollout-lab`, runbook | **A consolidar** |
 | PostgreSQL local P1 | **Não** | — | **Não aplicável** até haver artefatos no repo |
 
-Este documento **não** lista resultados de scan (contagens CVE, exit code de gate,
-révisions de Deployment) enquanto não forem transcritos de forma sanitizada a
-partir de uma execução real registrada nos campos do contrato acima.
+O scan Trivy/SBOM/gate High–Critical (Q4) está transcrito na subseção seguinte.
+Demais cenários P1 (build, observabilidade, fault, rollout) permanecem **a consolidar**
+até execução registrada nos campos do contrato acima.
+
+### P1-LAB — scan Trivy/SBOM gate Q4 — registro sanitizado (2026-09-29T03:51:33Z)
+
+Laboratório local no Docker host (`scan-security`). Artefatos em `lab/security/`
+descrevem o procedimento; esta subseção consolida **uma** execução observada — não
+substitui scan em registry nem admission em cluster.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P1-LAB / Q4; objetivo: scan de vulnerabilidades, SBOM CycloneDX e gate **HIGH/CRITICAL** sobre imagem lab |
+| Tempo (UTC) | Run principal **2026-09-29T03:51:33Z** (id de pasta de evidência `20260929T035133Z`) |
+| Entrada | `.\scripts\lab.ps1 -Action scan-security` (imagem lab construída localmente) |
+| Artefato | Imagem `irrah-lab-http:0.1.0`; referência `irrah-lab-http@sha256:0b17f44368496728ec3a44d7d8b24ba34188a8b53689264f2a68effe2bb72b7e` |
+| Scanner | Trivy **0.59.1** (`aquasec/trivy:0.59.1`) |
+| Política do gate | Severidades **HIGH** e **CRITICAL**; **sem** `--ignore-unfixed` |
+| Resultado do gate | **PASS**, exit **0** |
+| Contagens (relatório agregado) | CRITICAL=**0**, HIGH=**0**, MEDIUM=**0**, LOW=**0**, UNKNOWN=**0** |
+| Alvo observado | Target=**lab-http**, Type=**gobinary** — CRITICAL=**0**, HIGH=**0**, MEDIUM=**0**, LOW=**0** |
+| SBOM | CycloneDX **1.6** (`bomFormat=CycloneDX`); **3** componentes — inventário; **não** prova de segurança |
+| Artefatos locais (gitignored) | `trivy-report.json`, `sbom.cyclonedx.json`, `gate-high-critical.txt`, `execution-summary.md` |
+| Evidência bruta | `/.evidence/lab-security/20260929T035133Z/` — local, gitignored; **não** versionar |
+| Limites | Execução **somente** em laboratório local; **não** comprova scan em OCIR; **não** comprova admission/security gate em OKE; zero CVEs nesta execução **não** implica ausência absoluta de vulnerabilidades — depende da base de vulnerabilidades e das capacidades do Trivy na data do run; SBOM não substitui análise de risco nem política de deploy |
 
 ### P2: contrato de registro
 
