@@ -153,13 +153,13 @@ Interpretação obrigatória (não misturar camadas):
 | Build / smoke HTTP | Sim | `build`, `load`, `deploy`, `verify` | **Aprovado** (lab local); registro sanitizado abaixo; tag local **não** equivale a promoção por digest; OCI/OKE/CI **não** validados |
 | Trivy + SBOM + gate High/Critical | Sim (`lab/security/`) | `scan-security` | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; OCIR/OKE admission **não** validados |
 | Observabilidade Prom/Grafana | Sim | `deploy-obs`, `verify-obs` | **Aprovado** (lab local); registro sanitizado abaixo; OCI/OKE/produção **não** validados |
-| Fault injection / recuperação | Sim | `verify-fault-lab`, runbook | **A consolidar** |
+| Fault injection / recuperação | Sim | `verify-fault-lab`, runbook | **Aprovado** (lab local); registro sanitizado abaixo; OCI/OKE/produção **não** validados |
 | Rolling update / rollback | Sim | `verify-rollout-lab`, runbook | **A consolidar** |
 | PostgreSQL local P1 | **Não** | — | **Não aplicável** até haver artefatos no repo |
 
-Build / smoke HTTP e observabilidade Prom/Grafana estão transcritos nas subseções
-seguintes. O scan Trivy/SBOM/gate High–Critical (Q4) está transcrito na subseção
-dedicada abaixo. Demais cenários P1 (fault, rollout) permanecem **a consolidar**
+Build / smoke HTTP, observabilidade Prom/Grafana e fault injection / recuperação estão
+transcritos nas subseções seguintes. O scan Trivy/SBOM/gate High–Critical (Q4) está
+transcrito na subseção dedicada abaixo. Rolling update / rollback permanece **a consolidar**
 até execução registrada nos campos do contrato acima.
 
 ### P1-LAB — build / smoke HTTP — registro sanitizado (laboratório local)
@@ -201,6 +201,27 @@ pelo script **não** equivale a teste visual no browser nem a Managed Prometheus
 | **Validado (local)** | Deploy da stack Prometheus/Grafana; rollouts; discovery Kubernetes; **2** targets **lab-http** healthy/**up**; scrape de `/metrics`; métricas core (script); provisioning datasource/dashboard Grafana **conforme script** (não inspeção visual) |
 | **Não validado** | OCI; OKE; Managed Prometheus OCI; produção; SLA de produção; GitHub Actions; entrega real de alertas; comportamento sob carga de produção; acesso/interação humana com dashboard Grafana via browser |
 | Limites | kind local; validação programática — **sem** confirmação visual de UI Grafana |
+
+### P1-LAB — fault injection / recuperação — registro sanitizado (laboratório local)
+
+Cenário automatizado `verify-fault-lab` no kind (`kind-irrah-lab-133`, namespace
+`irrah-lab`). Degradação via env `LAB_FAULT_*` em `GET /` (runbook versionado); observação
+via PromQL no Prometheus conforme script. **Não** é chaos engineering em produção nem
+resiliência de infraestrutura cloud.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P1-LAB; objetivo: injetar fault reversível, observar degradação e recuperação, validar 2/2 Ready e checks HTTP |
+| Ambiente | Contexto **kind-irrah-lab-133**; namespace **irrah-lab**; stack Prometheus requerida pelo cenário |
+| Ação executada | `.\scripts\lab.ps1 verify-fault-lab` — **sucesso**; mensagem final: *Fault-injection lab scenario verified: degrade, observe, recover, two Ready replicas with HTTP checks.* |
+| Baseline (Prometheus) | `rate503=0`; `p95=0.00475` s |
+| Durante fault (Prometheus) | `rate503=0.836170811832483`; `p95=0.48` s — degradação **mensurável** |
+| Após recuperação (Prometheus) | `rate503=0`; `p95=0.00475` s — recuperação **mensurável** (fault desligado, rollouts concluídos pelo script) |
+| Estado final observado | Deployment **lab-http** **READY 2/2**, **UP-TO-DATE 2**, **AVAILABLE 2**; dois pods **Running** **1/1**, zero restarts; `LAB_FAULT_LATENCY_MS="0"`, `LAB_FAULT_ERROR_PERCENT="0"`; `git status --short` sem saída após execução |
+| Resultado global | **Aprovado** para critério P1 fault injection / recuperação local |
+| **Validado (local)** | Ciclo baseline → fault → recovery; taxa 503 e p95 elevados sob fault e normalizados após desativação do fault pelo script; rollout na ativação/remoção do fault; **2/2** réplicas Ready; checks HTTP in-pod (`/healthz`, `/readyz`, `/metrics`) conforme script; env de fault **zerada** ao final |
+| **Não validado** | OCI; OKE; multi-AZ; falha PostgreSQL; CPU/memória sob pressão real; falha de node; produção; SLA de produção; GitHub Actions; alert delivery; extrapolação kind → resiliência cloud |
+| Limites | Fault só em `GET /` (lab); limiares do script ≠ SLO produção; **sem** diretório `/.evidence/` dedicado neste cenário — registro sanitizado aqui |
 
 ### P1-LAB — scan Trivy/SBOM gate Q4 — registro sanitizado (2026-09-29T03:51:33Z)
 
