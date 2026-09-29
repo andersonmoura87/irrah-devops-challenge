@@ -44,7 +44,7 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | P0-TF | fmt; init readonly e validate nos três roots; testes mock | **Aprovado** (validação local Q1); registro sanitizado abaixo; mocks **não** validam OCI real |
 | P0-DIGEST | Casos válidos e inválidos do validador | **Aprovado** (validação local do contrato); registro sanitizado abaixo; **não** comprova runtime OCI |
 | P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | **Aprovado** (validação local); registro sanitizado abaixo; verificador **não** prova veracidade dos claims |
-| P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
+| P0-SCOPE | Status/diff, lockfiles e limites de alteração | **Aprovado** (inspeção local de escopo/versionamento); registro sanitizado abaixo; **não** equivale a secret scan |
 | P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
 | P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; thresholds versionados em runbook/`slo.go`; **não** SLA de produção; OCI/OKE **não** validados |
 | P2-PROVENANCE | `verify-provenance-lab`; Cosign sign+verify local | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; chaves/bundle em `/.evidence/` (gitignored); OCIR/OKE/Rekor **não** validados |
@@ -55,8 +55,7 @@ Se uma validação não puder ser executada, registrar como **bloqueada**, sem
 transformar inspeção de código em sucesso de runtime. O relatório final deve
 distinguir execução local de execução do workflow no GitHub.
 
-P0-TF, P0-DIGEST e P0-DOCS estão transcritos nas subseções seguintes. **P0-SCOPE** permanece
-**a consolidar** até execução registrada da mesma forma.
+P0-TF, P0-DIGEST, P0-DOCS e P0-SCOPE estão transcritos nas subseções seguintes.
 
 ### P0-TF — registro sanitizado (Q1 Terraform local)
 
@@ -117,6 +116,26 @@ verificados.
 | **Validado (local)** | Comportamento coberto pelos testes do verificador; links **locais** no escopo do script (**56** checados, **0** erros reportados); `git diff --check` |
 | **Não validado** | URLs externas; anchors; veracidade semântica dos claims; execução específica do workflow GitHub Actions; runtime ou provisionamento OCI; segurança/conformidade da infraestrutura |
 | Limites | Verificador comprova **existência/resolução local** conforme regras do script, não verdade do conteúdo nem disponibilidade de sites externos |
+
+### P0-SCOPE — registro sanitizado (escopo e higiene de versionamento)
+
+Inspeção **local** do índice Git, `.gitignore` e exemplos de ignore. Ausência de
+correspondências nos padrões pesquisados **não** equivale a secret scanning completo.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P0-SCOPE; objetivo: verificar escopo versionado, lockfiles, regras de ignore e working tree |
+| Estado Git | Branch **main**; commit observado **4d61280**; `git status --short` sem saída (working tree **limpo** antes e após as verificações) |
+| Índice — padrões Terraform sensíveis | `git ls-files` filtrado por `\.tfvars$`, `\.tfplan$`, `terraform\.tfstate`, `\.terraform/`, `backend\.backend\.hcl$` — **sem saída** (nenhum desses padrões no índice) |
+| Lockfiles versionados | `terraform/bootstrap-state/.terraform.lock.hcl`, `terraform/environments/staging/.terraform.lock.hcl`, `terraform/environments/production/.terraform.lock.hcl` — **3** |
+| Regras `.gitignore` (observadas) | `**/.terraform/`, `*.tfstate`, `*.tfstate.*`, `*.tfplan`, `*.tfvars`, `*.tfvars.json`, `*.backend.hcl`, `crash.log`, `crash.*.log`, `*.pem`, `*.key`, `kubeconfig*`, `!*.example`, `/.local/`, `/.evidence/` |
+| `git check-ignore -v` (amostra) | `terraform/environments/staging/terraform.tfvars` → `*.tfvars`; `terraform/environments/staging/backend.backend.hcl` → `*.backend.hcl`; `terraform/environments/staging/staging.tfplan` → `*.tfplan`; `terraform/bootstrap-state/terraform.tfvars` → `*.tfvars`; `terraform/bootstrap-state/backend.backend.hcl` → `*.backend.hcl`; `terraform/bootstrap-state/bootstrap.tfplan` → `*.tfplan` |
+| Índice — outros padrões sensíveis | `git ls-files` filtrado por `\.pem$`, `\.key$`, `kubeconfig*`, `/.evidence/`, `/.local/` — **sem saída** (apenas para **esses** padrões) |
+| Arquivos `.example` versionados | `terraform/bootstrap-state/backend.hcl.example`, `terraform/bootstrap-state/terraform.tfvars.example`, `terraform/environments/production/backend.hcl.example`, `terraform/environments/settings.tfvars.example`, `terraform/environments/staging/backend.hcl.example`, `terraform/kubernetes/access.yaml.example` |
+| Resultado global | **Aprovado** para critério P0-SCOPE local (escopo do índice + ignore observado + tree limpa) |
+| **Validado (local)** | Escopo do índice para os padrões pesquisados; regras de ignore listadas; comportamento de `git check-ignore` nos seis caminhos executados; presença dos três lockfiles; presença dos `.example` listados; working tree limpo |
+| **Não validado** | Secret scanning completo; leitura integral de todos os arquivos em busca de credenciais; histórico Git em busca de segredos removidos; runtime ou provisionamento OCI; segurança absoluta do repositório |
+| Limites | `.gitignore` **não** impede, por si só, commit de arquivo já rastreado ou de `git add -f`; este registro descreve regras e comportamento **observado**, não ausência global de segredos |
 
 ### P1-LAB: artefatos, execução e consolidação
 
