@@ -1,10 +1,27 @@
-# Contrato futuro dos security gates
+# Contrato dos security gates (lab local e pipeline futuro)
 
-**Proposta para P1, não implementada nem executada em P0.** Não há aplicação,
-Dockerfile, imagem construída, Trivy executado, SBOM gerada ou gate de scan no
-pipeline atual. A [Q4](../security/q4-container-vulnerability-governance.md) mantém
-o contexto de governança; este documento define o contrato verificável do futuro
-laboratório, sem alegar proteção de produção.
+A [Q4](../security/q4-container-vulnerability-governance.md) mantém o contexto de
+governança. Este arquivo distingue o que já foi **exercitado no laboratório local**
+do contrato **ainda não integrado** aos workflows de CI/release.
+
+**Implementado e validado localmente (lab P1; ver
+[OPERATIONAL-EVIDENCE.md](OPERATIONAL-EVIDENCE.md)):**
+
+- Trivy sobre a imagem lab (`scripts/lab.ps1 scan-security`, artefatos em
+  `lab/security/`);
+- SBOM CycloneDX conforme runbook e saídas registradas no lab;
+- gate High/Critical aplicado ao artefato scanneado no lab;
+- evidência sanitizada consolidada no registro P1-LAB (scan Trivy/SBOM).
+
+**Não implementado nem validado neste repositório:**
+
+- gate Trivy no GitHub Actions (workflows atuais não executam scan do lab);
+- gate de segurança no pipeline de release;
+- OCIR, OKE admission ou política em registry;
+- produção ou runtime OKE.
+
+As seções seguintes descrevem o **contrato verificável** para promoção futura no
+pipeline. Não caracterizam DevSecOps completo nem proteção de produção hoje.
 
 ## Identidade do artefato e fluxo mínimo
 
