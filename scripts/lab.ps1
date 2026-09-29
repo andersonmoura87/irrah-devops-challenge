@@ -93,6 +93,46 @@ function Get-PromQuerySum([string]$Query) {
     return $sum
 }
 
+function Get-PrometheusTargetsJson {
+    $targetsRaw = Invoke-Kubectl @('exec', 'deployment/prometheus', '-c', 'prometheus', '--', 'wget', '-qO-', 'http://127.0.0.1:9090/api/v1/targets')
+    $targets = (($targetsRaw -join "`n") | ConvertFrom-Json)
+    if ($targets.status -ne 'success') { throw 'Prometheus /api/v1/targets did not return success.' }
+    return $targets
+}
+
+function Format-LabHttpPrometheusTargetDetail([object[]]$LabHttpTargets) {
+    if (-not $LabHttpTargets -or $LabHttpTargets.Count -eq 0) { return '(none)' }
+    return ($LabHttpTargets | ForEach-Object {
+        $addr = [string]$_.discoveredLabels.'__address__'
+        if (-not $addr) { $addr = [string]$_.scrapeUrl }
+        $pod = [string]$_.labels.pod
+        $err = [string]$_.lastError
+        if (-not $err) { $err = '-' }
+        "pod=$pod health=$($_.health) addr=$addr lastError=$err"
+    }) -join '; '
+}
+
+function Wait-LabHttpPrometheusHealthyTargets {
+    param(
+        [int]$Expected = 2,
+        [int]$TimeoutSeconds = 120,
+        [int]$IntervalSeconds = 5
+    )
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastLabHttp = @()
+    $lastHealthy = @()
+    do {
+        $targets = Get-PrometheusTargetsJson
+        $lastLabHttp = @($targets.data.activeTargets | Where-Object { $_.labels.job -eq 'lab-http' })
+        $lastHealthy = @($lastLabHttp | Where-Object { $_.health -eq 'up' })
+        if ($lastHealthy.Count -eq $Expected) { return }
+        if ((Get-Date) -ge $deadline) { break }
+        Start-Sleep -Seconds $IntervalSeconds
+    } while ($true)
+    $detail = Format-LabHttpPrometheusTargetDetail $lastLabHttp
+    throw "Expected exactly $Expected healthy lab-http scrape targets after restore; timed out after ${TimeoutSeconds}s. Observed $($lastHealthy.Count) health=up of $($lastLabHttp.Count) active lab-http target(s). $detail"
+}
+
 function Get-LabSLISnapshot {
     return @{
         Rate200 = (Get-PromQuerySum 'sum(rate(lab_http_requests_total{job="lab-http",code="200"}[2m]))')
@@ -584,10 +624,7 @@ if ($Action -eq 'verify-rollout-lab') {
     Assert-Condition ($container.readinessProbe.httpGet.path -eq '/readyz') 'Readiness probe path was not restored to /readyz.'
     Assert-Condition ($container.image -eq $image) 'Deployment image was not restored to irrah-lab-http:0.1.0.'
     Invoke-Kubectl @('rollout', 'status', 'deployment/prometheus', '--timeout=180s')
-    $targetsRaw = Invoke-Kubectl @('exec', 'deployment/prometheus', '-c', 'prometheus', '--', 'wget', '-qO-', 'http://127.0.0.1:9090/api/v1/targets')
-    $targets = (($targetsRaw -join "`n") | ConvertFrom-Json)
-    $active = @($targets.data.activeTargets | Where-Object { $_.labels.job -eq 'lab-http' -and $_.health -eq 'up' })
-    Assert-Condition ($active.Count -eq 2) "Expected two healthy lab-http scrape targets after restore; found $($active.Count)."
+    Wait-LabHttpPrometheusHealthyTargets -Expected 2 -TimeoutSeconds 120 -IntervalSeconds 5
     $summary = @"
 # Rollout lab execution summary
 
