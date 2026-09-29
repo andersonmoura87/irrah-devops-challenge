@@ -152,15 +152,15 @@ Interpretação obrigatória (não misturar camadas):
 | --- | --- | --- | --- |
 | Build / smoke HTTP | Sim | `build`, `load`, `deploy`, `verify` | **Aprovado** (lab local); registro sanitizado abaixo; tag local **não** equivale a promoção por digest; OCI/OKE/CI **não** validados |
 | Trivy + SBOM + gate High/Critical | Sim (`lab/security/`) | `scan-security` | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; OCIR/OKE admission **não** validados |
-| Observabilidade Prom/Grafana | Sim | `deploy-obs`, `verify-obs` | **A consolidar** |
+| Observabilidade Prom/Grafana | Sim | `deploy-obs`, `verify-obs` | **Aprovado** (lab local); registro sanitizado abaixo; OCI/OKE/produção **não** validados |
 | Fault injection / recuperação | Sim | `verify-fault-lab`, runbook | **A consolidar** |
 | Rolling update / rollback | Sim | `verify-rollout-lab`, runbook | **A consolidar** |
 | PostgreSQL local P1 | **Não** | — | **Não aplicável** até haver artefatos no repo |
 
-Build / smoke HTTP está transcrito na subseção seguinte. O scan Trivy/SBOM/gate
-High–Critical (Q4) está transcrito na subseção dedicada abaixo. Demais cenários P1
-(observabilidade, fault, rollout) permanecem **a consolidar** até execução registrada
-nos campos do contrato acima.
+Build / smoke HTTP e observabilidade Prom/Grafana estão transcritos nas subseções
+seguintes. O scan Trivy/SBOM/gate High–Critical (Q4) está transcrito na subseção
+dedicada abaixo. Demais cenários P1 (fault, rollout) permanecem **a consolidar**
+até execução registrada nos campos do contrato acima.
 
 ### P1-LAB — build / smoke HTTP — registro sanitizado (laboratório local)
 
@@ -181,6 +181,26 @@ promoção imutável por digest.
 | **Validado (local)** | Pipeline build→load→deploy→verify no kind; rollout 2/2; probes HTTP in-cluster; securityContext restrito e ServiceAccount dedicada conforme saída do verify |
 | **Não validado** | GitHub Actions; push/pull em registry ou OCIR; deploy em OKE; runtime OCI; produção; SLA/disponibilidade de produção; observabilidade Prom/Grafana (pods podem existir no cluster — **não** consolida cenário observabilidade) |
 | Limites | Laboratório kind single-node; imagem por **tag** local; sem evidência de cadeia CI/CD ou digest promovido |
+
+### P1-LAB — observabilidade Prom/Grafana — registro sanitizado (laboratório local)
+
+Stack de observabilidade no kind (`kind-irrah-lab-133`). Provisioning Grafana validado
+pelo script **não** equivale a teste visual no browser nem a Managed Prometheus OCI.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P1-LAB; objetivo: deploy Prometheus/Grafana no namespace lab e validar discovery, scrape e métricas core |
+| Ambiente | Contexto Kubernetes **kind-irrah-lab-133** |
+| Ações executadas | `.\scripts\lab.ps1 deploy-obs` → `.\scripts\lab.ps1 verify-obs` — **sucesso** |
+| `deploy-obs` (recursos aplicados) | ServiceAccount/Role/RoleBinding **prometheus**; ConfigMap **prometheus-config**; Deployment/Service **prometheus**; ConfigMap **grafana-provisioning**; Deployment/Service **grafana**; rollouts Prometheus e Grafana **sucesso** |
+| `verify-obs` | Rollouts Prometheus e Grafana **sucesso**; dois pods **lab-http** Ready/Running; Prometheus **Running**; Grafana **Running**; mensagem final: *Verified: two lab-http targets up, core lab metrics present, Grafana datasource/dashboard provisioned.* |
+| Estado observado | **lab-http** **2/2**; **prometheus** **1/1**; **grafana** **1/1**; Services **lab-http** :8080, **prometheus** :9090, **grafana** :3000 |
+| API Prometheus `/api/v1/targets` | `status=success`; **2** `activeTargets` job **lab-http** — pods `lab-http-7ddc8746ff-rksq2`, `lab-http-7ddc8746ff-n8mgc`; `metrics_path=/metrics`, `health=up`, `lastError` vazio, `scrapeInterval=15s`, `scrapeTimeout=10s` |
+| Métricas core | Presença verificada por `verify-obs` conforme implementação versionada do script |
+| Resultado global | **Aprovado** para critério P1 observabilidade local |
+| **Validado (local)** | Deploy da stack Prometheus/Grafana; rollouts; discovery Kubernetes; **2** targets **lab-http** healthy/**up**; scrape de `/metrics`; métricas core (script); provisioning datasource/dashboard Grafana **conforme script** (não inspeção visual) |
+| **Não validado** | OCI; OKE; Managed Prometheus OCI; produção; SLA de produção; GitHub Actions; entrega real de alertas; comportamento sob carga de produção; acesso/interação humana com dashboard Grafana via browser |
+| Limites | kind local; validação programática — **sem** confirmação visual de UI Grafana |
 
 ### P1-LAB — scan Trivy/SBOM gate Q4 — registro sanitizado (2026-09-29T03:51:33Z)
 
