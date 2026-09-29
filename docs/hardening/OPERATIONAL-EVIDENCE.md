@@ -45,7 +45,7 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | P0-DIGEST | Casos válidos e inválidos do validador | **Aprovado** (validação local do contrato); registro sanitizado abaixo; **não** comprova runtime OCI |
 | P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | **Aprovado** (validação local); registro sanitizado abaixo; verificador **não** prova veracidade dos claims |
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | **Aprovado** (inspeção local de escopo/versionamento); registro sanitizado abaixo; **não** equivale a secret scan |
-| P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
+| P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | **Aprovado** (consolidação local): cenários P1 documentados abaixo com registro sanitizado; laboratório **local** kind; PostgreSQL P1 **não aplicável/não implementado** no escopo atual; OCI/OKE/OCIR/produção/CI do lab **não** validados |
 | P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; thresholds versionados em runbook/`slo.go`; **não** SLA de produção; OCI/OKE **não** validados |
 | P2-PROVENANCE | `verify-provenance-lab`; Cosign sign+verify local | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; chaves/bundle em `/.evidence/` (gitignored); OCIR/OKE/Rekor **não** validados |
 | OCI | Casos OCI-01–07, OCI-09 em [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Não executados nesta iteração |
