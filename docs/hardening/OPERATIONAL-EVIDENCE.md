@@ -107,13 +107,14 @@ verificados.
 | Identificação | P0-DOCS; objetivo: exercitar o verificador de links locais, varrer Markdown do repo e `git diff --check` |
 | Ambiente | Node **v22.12.0** |
 | Entrada (testes) | `node --test scripts/check-markdown-links.test.mjs` — **6** passed, **0** failed (comportamento: paths relativos/raiz, imagens, títulos e reference definitions; falha com source/line para arquivo local ausente; URLs externas, anchors e exemplos de código fora do escopo de arquivo local; fragmentos/query só no destino arquivo; paths externos e encoding malformado falham; case mismatch e alvos ignorados/local-only não passam só em um OS) |
-| Entrada (varredura) | `node scripts/check-markdown-links.mjs` — **18** arquivos Markdown; **56** links locais; **0** errors (**URLs externas e anchors não verificados**) |
+| Entrada (varredura — execução histórica) | `node scripts/check-markdown-links.mjs` — **18** arquivos Markdown; **56** links locais; **0** errors (**URLs externas e anchors não verificados**) |
+| Revalidação final (encerramento auditoria) | Mesmo comando no **HEAD `be4b882` (alinhado a `main` no momento da revalidação)** — **18** arquivos Markdown; **58** links locais; **0** errors (**URLs externas e anchors não verificados**, fora do escopo do verificador); complementa o registro histórico (**56** links / **0** errors) **sem** reescrevê-lo; **não** evidência de runtime, OCI ou GitHub Actions |
 | Entrada (whitespace) | `git diff --check` — **PASS** (sem saída; exit de sucesso) |
 | Working tree | Permaneceu **limpo** após a execução (`git status --short` sem saída) |
 | Artefatos versionados | `scripts/check-markdown-links.mjs`, `scripts/check-markdown-links.test.mjs` |
 | Integração declarada (repo) | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) executa `node --test scripts/check-markdown-links.test.mjs` e `node scripts/check-markdown-links.mjs` — **sem** registro neste documento de run específico do GitHub Actions |
 | Resultado global | **Aprovado** para critério P0-DOCS local (verificador + varredura + `git diff --check`) |
-| **Validado (local)** | Comportamento coberto pelos testes do verificador; links **locais** no escopo do script (**56** checados, **0** erros reportados); `git diff --check` |
+| **Validado (local)** | Comportamento coberto pelos testes do verificador; varredura histórica (**56** links locais checados, **0** erros); revalidação final registrada (**58** links locais checados, **0** erros); `git diff --check` (histórico e revalidação final sem erros) |
 | **Não validado** | URLs externas; anchors; veracidade semântica dos claims; execução específica do workflow GitHub Actions; runtime ou provisionamento OCI; segurança/conformidade da infraestrutura |
 | Limites | Verificador comprova **existência/resolução local** conforme regras do script, não verdade do conteúdo nem disponibilidade de sites externos |
 
