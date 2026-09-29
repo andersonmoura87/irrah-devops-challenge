@@ -333,10 +333,27 @@ e reduzir exposição sem ocultar findings ou sacrificar disponibilidade sem an�
 ## Evidência e limites
 
 A [documentação detalhada da Q4](docs/security/q4-container-vulnerability-governance.md)
-contém processo, política, exceções, responsabilidades e critérios de fechamento.
-**Presente nesta entrega:** documentação. **Proposto:** controles no pipeline real
-da aplicação e na operação. **Não executado:** scan de imagem real, geração de
-SBOM da aplicação, assinatura, integração OCIR/OKE, deploy ou validação de workloads.
-Os workflows da Q2 permanecem intactos e não aplicam os gates descritos na Q4.
-Não se afirma conformidade, ausência de vulnerabilidades ou segurança comprovada
-por validação local dos documentos.
+contém processo, política, exceções, responsabilidades e critérios de fechamento
+propostos para a aplicação e a operação.
+
+**Documentação e processo (versionados):** governança de CVEs, política de promoção,
+exceções e papéis — sem equivaler, por si só, a execução em produção ou em OCI.
+
+**Executado em laboratório local** (imagem `irrah-lab-http`, kind/Docker host; registro
+sanitizado em [docs/hardening/OPERATIONAL-EVIDENCE.md](docs/hardening/OPERATIONAL-EVIDENCE.md)):
+scan Trivy da imagem, SBOM CycloneDX, gate **HIGH/CRITICAL** (sem `--ignore-unfixed`),
+Cosign `sign-blob` + `verify-blob` sobre digest local e teste negativo com chave pública
+incompatível. Esses runs demonstram o **procedimento** e artefatos do hardening P1/P2;
+**não** comprovam scan em OCIR, admission/security gate em OKE, deploy em produção,
+assinatura de imagem publicada em registry, Rekor/keyless/Fulcio nem ausência absoluta
+de vulnerabilidades (resultado depende do scanner, da base de advisories e do instante
+do run; SBOM é inventário, não prova de segurança).
+
+**Ainda não executado / fora do escopo destas evidências:** integração dos gates da Q4
+no pipeline CI/CD da Q2, scan ou política no registry OCIR, admission em OKE, validação
+de workloads em ambiente OCI e fechamento operacional em staging/production conforme
+a política proposta.
+
+Os workflows da Q2 permanecem intactos e **não** aplicam automaticamente os gates
+descritos na Q4. Não se afirma conformidade regulatória, segurança absoluta ou imagem
+livre de CVEs com base apenas na documentação ou nos laboratórios locais registrados.
