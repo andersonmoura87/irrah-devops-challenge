@@ -47,7 +47,7 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
 | P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
 | P2-SLO | `verify-slo-lab`; fases baseline/fault/recovery | A consolidar; thresholds versionados em runbook/`slo.go`, não SLA produção |
-| P2-PROVENANCE | `verify-provenance-lab`; Cosign sign+verify local | A consolidar; chaves em `/.evidence/`; OCIR **não** validado |
+| P2-PROVENANCE | `verify-provenance-lab`; Cosign sign+verify local | **Aprovado** (lab local 2026-09-29); registro sanitizado abaixo; chaves/bundle em `/.evidence/` (gitignored); OCIR/OKE/Rekor **não** validados |
 | OCI | Casos OCI-01–07, OCI-09 em [OCI-VALIDATION-GAPS.md](OCI-VALIDATION-GAPS.md) | Não executados nesta iteração |
 | OCI-08 | OKE / workers / deploy (ver registro abaixo) | **Bloqueado** — execução parcial 2026-09-29; ver detalhe sanitizado |
 
@@ -87,7 +87,26 @@ partir de uma execução real registrada nos campos do contrato acima.
 | P2-PROVENANCE | `verify-provenance-lab` | Digest da imagem, versão Cosign, resultado verify OK + verify com chave errada FAIL | Assinatura OCIR validada ou Rekor/keyless |
 
 Mesmas regras de campos (UTC real, commit, versões de ferramentas) aplicam-se a P2.
-Não preencher métricas SLI ou exit codes neste arquivo sem transcrição de execução.
+P2-PROVENANCE está transcrito na subseção seguinte. P2-SLO permanece **a consolidar**
+até execução registrada da mesma forma.
+
+### P2-PROVENANCE — registro sanitizado (2026-09-29T04:00:35Z)
+
+Laboratório local no Docker host (`verify-provenance-lab`). **Não** é assinatura de
+imagem no OCIR, **não** prova deploy em OKE e **não** substitui pipeline de release.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P2-PROVENANCE; objetivo: `sign-blob` + `verify-blob` sobre digest local; teste negativo com chave pública incompatível |
+| Tempo (UTC) | Run principal **2026-09-29T04:00:35Z** (id de pasta de evidência) |
+| Entrada | `.\scripts\lab.ps1 -Action verify-provenance-lab` (após build da imagem lab) |
+| Artefato | Imagem `irrah-lab-http:0.1.0`; digest assinado `sha256:0b17f44368496728ec3a44d7d8b24ba34188a8b53689264f2a68effe2bb72b7e` |
+| Ferramenta | Cosign `gcr.io/projectsigstore/cosign:v2.4.1`; `sign-blob` com `--tlog-upload=false`; `verify-blob` com `--insecure-ignore-tlog=true` (**transparency log Rekor não verificado**) |
+| Teste positivo | `verify-blob` com chave pública do par que assinou o blob: **aprovado**, exit **0**, mensagem observada **Verified OK** |
+| Teste negativo | Segundo par de chaves efêmeras; **mesmo** `artifact.digest` e **mesmo** `bundle.json` da assinatura original; `verify-blob` com chave pública errada: **reprovado**, exit **1**; erro observado: `invalid signature when validating ASN.1 encoded signature` — falha na **validação criptográfica** (assinatura não confere com a chave), não por arquivo ausente ou path inválido |
+| Resultado global | **Aprovado** para o critério do lab (positivo passa; negativo falha por chave incompatível) |
+| Evidência bruta | `/.evidence/lab-provenance/20260929T040035Z/` — local, gitignored; contém chaves efêmeras e bundle; **não** versionar |
+| Limites | Sem integração OCIR/OKE; sem keyless/Fulcio; sem alegação de verificação de tlog; consumidor de produção exigiria política distinta (digest + confiança no emissor do bundle) |
 
 ### OCI-08 — registro sanitizado (2026-09-29)
 

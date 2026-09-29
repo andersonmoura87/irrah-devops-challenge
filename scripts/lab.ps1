@@ -370,9 +370,9 @@ if ($Action -eq 'verify-provenance-lab') {
     $wrongDir = Join-Path $runDir 'wrong-key'
     Invoke-CosignContainer @('generate-key-pair') $wrongDir -CosignPassword 'lab-local-ephemeral-wrong'
     $verifyWrong = Invoke-CosignContainer @(
-        'verify-blob', '--key', 'cosign.pub', '--bundle', 'bundle.json',
+        'verify-blob', '--key', 'wrong-key/cosign.pub', '--bundle', 'bundle.json',
         '--insecure-ignore-tlog=true', 'artifact.digest'
-    ) $wrongDir -AllowFailure
+    ) $runDir -AllowFailure
     Assert-Condition ($verifyWrong -ne 0) 'Expected cosign verify-blob to fail with non-matching public key.'
     $summary = @"
 # Provenance lab execution summary
