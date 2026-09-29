@@ -42,7 +42,7 @@ este documento não atribui aprovação antecipada aos comandos do bootstrap.
 | ID | Verificação | Situação do registro |
 | --- | --- | --- |
 | P0-TF | fmt; init readonly e validate nos três roots; testes mock | **Aprovado** (validação local Q1); registro sanitizado abaixo; mocks **não** validam OCI real |
-| P0-DIGEST | Casos válidos e inválidos do validador | A consolidar com resultado dos testes |
+| P0-DIGEST | Casos válidos e inválidos do validador | **Aprovado** (validação local do contrato); registro sanitizado abaixo; **não** comprova runtime OCI |
 | P0-DOCS | Links locais, testes do verificador, `git diff --check` e revisão de claims | A consolidar; verificador não prova veracidade dos claims |
 | P0-SCOPE | Status/diff, lockfiles e limites de alteração | A consolidar; working tree com mudanças não é commit final |
 | P1-LAB | Ver tabela abaixo (artefatos vs execução vs consolidação) | Parcial: artefatos versionados; execuções locais a consolidar por cenário |
@@ -55,7 +55,7 @@ Se uma validação não puder ser executada, registrar como **bloqueada**, sem
 transformar inspeção de código em sucesso de runtime. O relatório final deve
 distinguir execução local de execução do workflow no GitHub.
 
-P0-TF (Q1 Terraform) está transcrito na subseção seguinte. Demais itens P0 permanecem
+P0-TF e P0-DIGEST estão transcritos nas subseções seguintes. Demais itens P0 permanecem
 **a consolidar** até execução registrada da mesma forma.
 
 ### P0-TF — registro sanitizado (Q1 Terraform local)
@@ -77,6 +77,25 @@ Validação **local** da configuração Terraform da Q1. Provider OCI **mockado*
 | **Validado (local)** | Formatação/configuração Terraform exercitada via init readonly + validate nos três roots; contratos dos `terraform test`; **8** testes **PASS** / **0** **FAIL**; rejeições negativas esperadas nos testes de política |
 | **Não validado** | Backend remoto OCI real; IAM efetivo na OCI; criação real de VCN/OKE/PostgreSQL/Object Storage/Vault; conectividade; disponibilidade; comportamento multi-AZ; `terraform apply`; ambiente OCI operacional; conteúdo de `terraform.tfvars` ou identificadores de tenancy/compartment/grupos |
 | Limites | Mocks e `terraform test` comprovam **contratos declarados**, não runtime OCI; ver **OCI-08** e lacunas OCI para provisionamento real |
+
+### P0-DIGEST — registro sanitizado (validador de digest local)
+
+Validação **local** do contrato sintático de digest em `scripts/validate-digest.sh`
+(exercitado por `scripts/test-digest.sh`). Execução observada **sem** alteração do
+working tree.
+
+| Campo | Conteúdo |
+| --- | --- |
+| Identificação | P0-DIGEST; objetivo: aceitar digests válidos e rejeitar entradas inválidas conforme contrato |
+| Entrada | `bash scripts/test-digest.sh` (execução local) |
+| Contrato | Prefixo `sha256:` seguido **exatamente** de **64** caracteres hexadecimais **minúsculos** (`scripts/validate-digest.sh`) |
+| Resultado | **18** passed, **0** failed |
+| Casos válidos (aceitos) | `valid`, `valid_hex_letters` — **2** |
+| Casos inválidos (rejeitados) | `invalid_prefix`, `invalid_suffix`, `newline_before`, `newline_after`, `original_multiline_regression`, `carriage_return_before`, `carriage_return_after`, `crlf_after`, `leading_space`, `trailing_space`, `embedded_space`, `short`, `long`, `uppercase`, `non_hex`, `empty` — **16** |
+| Artefatos versionados | `scripts/test-digest.sh`, `scripts/validate-digest.sh` |
+| Integração declarada (repo) | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) executa `scripts/test-digest.sh`; [`.github/workflows/release.yml`](../../.github/workflows/release.yml) usa `scripts/validate-digest.sh` para validar `image_digest` — **sem** registro neste documento de run específico do GitHub Actions |
+| Resultado global | **Aprovado** para critério P0-DIGEST local (contrato + casos de teste) |
+| Limites | **Não** comprova build/push de imagem; **não** comprova publicação em OCIR; **não** comprova promoção real por digest; **não** comprova deploy em OKE; validação sintática **não** substitui evidência de runtime OCI |
 
 ### P1-LAB: artefatos, execução e consolidação
 
